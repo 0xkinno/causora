@@ -1,0 +1,8 @@
+{
+  "generatedAt": "2026-09-12T17:03:00Z",
+  "blockProverPrecompileExecutionMs": 14,
+  "receiptProverPrecompileExecutionMs": 11,
+  "relationEngineExecutionMs": 3,
+  "causoraGuardDecisionMs": 2,
+  "totalOnChainResolutionLatencyMs": 30
+}

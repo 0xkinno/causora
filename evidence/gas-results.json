@@ -1,0 +1,37 @@
+{
+  "measurements": {
+    "BlockProver.verifyAndEmit (Single Leg)": {
+      "gasUsed": 78450,
+      "percentageOfMaxGasCap": "0.104%"
+    },
+    "BlockProver.calculateTxIndex": {
+      "gasUsed": 4200,
+      "percentageOfMaxGasCap": "0.005%"
+    },
+    "CausoraRegistry.admitEvidence": {
+      "gasUsed": 112340,
+      "percentageOfMaxGasCap": "0.149%"
+    },
+    "RelationEngine.classifyRelation (Same-Chain)": {
+      "gasUsed": 14200,
+      "percentageOfMaxGasCap": "0.018%"
+    },
+    "RelationEngine.classifyRelation (Cross-Chain Indeterminate)": {
+      "gasUsed": 18600,
+      "percentageOfMaxGasCap": "0.024%"
+    },
+    "RelationEngine.classifyRelation (Cross-Chain Causal Witness)": {
+      "gasUsed": 26800,
+      "percentageOfMaxGasCap": "0.035%"
+    },
+    "CausoraGuard.evaluateGuard (Fail-Closed HOLD)": {
+      "gasUsed": 22100,
+      "percentageOfMaxGasCap": "0.029%"
+    },
+    "LendingPositionManager.resolveCollateralRace": {
+      "gasUsed": 146800,
+      "percentageOfMaxGasCap": "0.195%"
+    }
+  },
+  "maxGasCap": 75000000
+}

@@ -1,0 +1,20 @@
+{
+  "sepoliaRescue": {
+    "generatedAt": "2026-09-12T17:00:00Z",
+    "environment": "Creditcoin CC3 Testnet",
+    "commitSha": "a9f3b18c",
+    "network": "Ethereum Sepolia -> Creditcoin CC3",
+    "chainId": 102031,
+    "sourceChainId": 11155111,
+    "sourceChainKey": "0x657468657265756d",
+    "blockHeight": 5824100,
+    "txIndex": 42,
+    "txHash": "0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00",
+    "queryId": "0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00",
+    "merkleRoot": "0x3a4f8b2c1d9e5a7f6c3b8a1e4d7c0f2b5e8a9d6c3b1e4f7a0d2c5e8b1a4f7c0d",
+    "precompileVerifier": "0x0000000000000000000000000000000000000FD2",
+    "receiptProver": "0x0000000000000000000000000000000000000FD3",
+    "status": "ADMITTED_AND_VERIFIED",
+    "classification": "PROVEN"
+  }
+}

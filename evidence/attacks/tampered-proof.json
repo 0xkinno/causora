@@ -1,0 +1,8 @@
+{
+  "attackName": "Tampered Merkle Proof & Continuity",
+  "attackerVector": "Bit-flipping Merkle sibling hashes or un-attested block root",
+  "targetContract": "0x0000000000000000000000000000000000000FD2",
+  "expectedBehavior": "REVERT in native BlockProver precompile",
+  "mitigation": "Native cryptographic tree hashing and continuity verification against Creditcoin attestor consensus",
+  "result": "FAIL_CLOSED_CONFIRMED"
+}

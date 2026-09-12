@@ -1,0 +1,50 @@
+{
+  "name": "causora",
+  "version": "1.0.0",
+  "description": "Cross-Chain Orderability Firewall for DeFi on Creditcoin 3 / Attestcoin Protocol",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "hardhat compile && tsc -p tsconfig.json",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:security": "hardhat test tests/attacks/AdversarialAttacks.test.ts",
+    "test:invariants": "hardhat test tests/invariant/OrderabilityInvariants.test.ts",
+    "doctor": "hardhat run scripts/doctor.ts",
+    "judge": "hardhat run scripts/judge.ts",
+    "attack": "hardhat run scripts/attack.ts",
+    "export:abis": "ts-node scripts/export-abis.ts",
+    "deploy:cc3": "hardhat run scripts/deploy.ts --network creditcoin_testnet",
+    "dev": "cd site && npm run dev",
+    "build:ui": "cd site && npm run build",
+    "test:e2e": "cd site && npx playwright test"
+  },
+  "keywords": [
+    "creditcoin",
+    "attestcoin",
+    "cross-chain",
+    "orderability",
+    "firewall",
+    "defi",
+    "blockchain",
+    "smart-contracts"
+  ],
+  "author": "Causora Protocol",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@types/chai": "^4.3.16",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.14.9",
+    "chai": "^4.4.1",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.1",
+    "hardhat": "^2.22.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.2"
+  },
+  "dependencies": {
+    "exponential-backoff": "^3.1.1"
+  }
+}

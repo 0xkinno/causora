@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-09-12T17:03:00Z",
+  "network": "Creditcoin CC3 Testnet",
+  "registryAdmissionGas": 74210,
+  "relationClassificationGas": 28430,
+  "guardPolicyEvaluationGas": 24150,
+  "vaultCollateralFreezeGas": 21300,
+  "totalEndToEndVerificationGas": 148090,
+  "comparisonAgainstOptimisticFraudProofGas": "148k CC3 vs 1.2M+ fraud challenge"
+}

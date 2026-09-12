@@ -1,0 +1,19 @@
+{
+  "chains": [
+    {
+      "chainKey": 1,
+      "chainId": 11155111,
+      "chainName": "Ethereum Sepolia",
+      "encoding": 1,
+      "role": "Active Source Chain for Collateral & Lending Events"
+    },
+    {
+      "chainKey": 3,
+      "chainId": 1,
+      "chainName": "Ethereum Mainnet",
+      "encoding": 1,
+      "role": "Source Chain for Real DeFi Liquidation & Settlement Events"
+    }
+  ],
+  "verifiedAt": "2026-09-12T08:07:20.690Z"
+}

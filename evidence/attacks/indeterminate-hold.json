@@ -1,0 +1,8 @@
+{
+  "attackName": "Independent Chain Timestamp Precedence Claim",
+  "attackerVector": "Claiming event precedence across independent chains based on RPC/local timestamps",
+  "targetContract": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  "expectedBehavior": "Return CROSS_CHAIN_INDETERMINATE and transition position to HELD",
+  "mitigation": "Formal orderability model rejects timestamps as authoritative; enforces cryptographic causal witness or fails closed",
+  "result": "FAIL_CLOSED_CONFIRMED"
+}

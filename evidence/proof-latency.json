@@ -1,0 +1,35 @@
+{
+  "benchmarks": [
+    {
+      "operation": "ProofBuilder API Response",
+      "avgLatencyMs": 420,
+      "minLatencyMs": 310,
+      "maxLatencyMs": 650
+    },
+    {
+      "operation": "BlockProver On-Chain Verification (0xFD2)",
+      "avgLatencyMs": 12,
+      "minLatencyMs": 8,
+      "maxLatencyMs": 18
+    },
+    {
+      "operation": "calculateTxIndex Merkle Ordinal Recovery",
+      "avgLatencyMs": 1,
+      "minLatencyMs": 0.5,
+      "maxLatencyMs": 2
+    },
+    {
+      "operation": "RelationEngine Formal Classification",
+      "avgLatencyMs": 3,
+      "minLatencyMs": 2,
+      "maxLatencyMs": 5
+    },
+    {
+      "operation": "CausoraGuard Policy Enforcement",
+      "avgLatencyMs": 4,
+      "minLatencyMs": 2.5,
+      "maxLatencyMs": 6
+    }
+  ],
+  "totalP95PipelineLatencyMs": 480
+}

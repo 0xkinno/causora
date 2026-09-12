@@ -1,0 +1,9 @@
+{
+  "networkName": "Creditcoin CC3 Testnet",
+  "chainId": 102031,
+  "rpcUrl": "https://rpc.cc3-testnet.creditcoin.network",
+  "blockProverPrecompile": "0x0000000000000000000000000000000000000FD2",
+  "chainInfoPrecompile": "0x0000000000000000000000000000000000000fD3",
+  "proofBuilderUrl": "https://prover.cc3-testnet.creditcoin.network",
+  "explorerUrl": "https://creditcoin-testnet.blockscout.com"
+}

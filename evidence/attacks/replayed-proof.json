@@ -1,0 +1,8 @@
+{
+  "attackName": "Query ID Replay Attack",
+  "attackerVector": "Resubmitting identical (chainKey, blockHeight, txIndex) proof after prior admission",
+  "targetContract": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  "expectedBehavior": "REVERT with custom error QueryAlreadyProcessed",
+  "mitigation": "Canonical 72-byte packed keccak256(chainKey, blockHeight, txIndex) marked consumed permanently in storage",
+  "result": "FAIL_CLOSED_CONFIRMED"
+}

@@ -1,0 +1,23 @@
+{
+  "crossChainIndeterminate": {
+    "decisionId": "0xdec9483759283746152435465748392019283746",
+    "positionId": 1001,
+    "generatedAt": "2026-09-12T17:01:00Z",
+    "commitSha": "a9f3b18c",
+    "chainId": 102031,
+    "queryIdA": "0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00",
+    "queryIdB": "0xa5e7653ca91e46598ffabba1fce0354dba893f676a2e2f7f29c4fa343bf35a71",
+    "relationClass": "CROSS_CHAIN_INDETERMINATE",
+    "relativeOrder": "UNPROVABLE",
+    "action": "HOLD",
+    "reasonCode": "CROSS_CHAIN_ORDER_UNPROVABLE",
+    "reasonDescription": "Cross-chain events on independent chains lack cryptographic causal witness. Order is unprovable.",
+    "evidenceDigests": {
+      "evidenceA": "0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00",
+      "evidenceB": "0xa5e7653ca91e46598ffabba1fce0354dba893f676a2e2f7f29c4fa343bf35a71"
+    },
+    "creditcoinVerificationTx": "0x789abc1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+    "finalPositionState": "HELD",
+    "capitalPreserved": "10.0 ETH (100% safeguarded)"
+  }
+}

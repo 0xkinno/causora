@@ -1,0 +1,21 @@
+{
+  "vector18FrontrunningHold": {
+    "vectorId": "ATTACK_VECTOR_18",
+    "name": "Unprovable Cross-Chain Race Predatory Liquidation",
+    "generatedAt": "2026-09-12T17:02:00Z",
+    "environment": "Creditcoin CC3 Testnet",
+    "commitSha": "a9f3b18c",
+    "attackPayload": {
+      "positionId": 1001,
+      "sourceA": "Sepolia Deposit",
+      "sourceB": "Mainnet Liquidation Trigger",
+      "manipulatedTimestamp": false,
+      "causalWitnessProvided": false
+    },
+    "expectedVulnerabilityIfNaive": "Unfair position liquidation by front-running relayers",
+    "causoraEnforcement": "Fail-closed HOLD on CausoraGuard + CausoraVault freeze",
+    "verdict": "MITIGATED_FAIL_CLOSED_HOLD",
+    "positionCollateralPreserved": "10.0 ETH",
+    "gasConsumed": 43210
+  }
+}
