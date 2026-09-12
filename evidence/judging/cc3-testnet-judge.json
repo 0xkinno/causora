@@ -1,17 +1,17 @@
 {
-  "judgingRunId": "JUDGE_CC3_1789241025358",
+  "judgingRunId": "JUDGE_CC3_1789247885726",
   "network": "Creditcoin CC3 Testnet",
   "chainId": 102031,
   "operator": "0xe4B713e3cF2E550147f9cc09d751f276E7B9A64e",
-  "timestamp": "2026-09-12T19:23:45.358Z",
+  "timestamp": "2026-09-12T21:18:05.726Z",
   "status": "CC3_TESTNET_VERIFIED",
   "verifiedContracts": {
-    "registry": "0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF",
-    "relationEngine": "0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49",
-    "guard": "0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5",
-    "lendingPositionManager": "0x33979FFdC1B60cF727A90c043f1EC5CB15f6BB91",
-    "vault": "0x7047D67Ef69F40F9340Fd97EDF79276458238cfe",
-    "testCollateralToken": "0x43410D288dFA265A560eb7DfFCa2991fA687d78d"
+    "registry": "0x87F61f848EdD7C3e0752Ded3bf9C303E7c74BD81",
+    "relationEngine": "0x59a9771e60ED99cBC583fe4C3fd9e83e94AF606d",
+    "guard": "0x4CABa84eF2D49dCFfDD5456AADEA5A42eB4a4699",
+    "lendingPositionManager": "0x94B336Cdb7aDacffE270a8f1B607499Be3656518",
+    "vault": "0x196a78ef8e039bD7E03C8d38694A0e5fB4EeBE92",
+    "testCollateralToken": "0xC9F496A95f2Ab073976579CdeED113Bd1Ee71C11"
   },
   "precompiles": {
     "blockProver": "0x0000000000000000000000000000000000000FD2",

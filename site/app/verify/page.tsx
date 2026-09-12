@@ -12,12 +12,19 @@ import {
   Cpu,
   Copy,
   Check,
-  Zap,
-  FlaskConical,
-  ExternalLink,
-  AlertCircle
+  AlertTriangle,
+  AlertCircle,
+  XCircle,
+  ExternalLink
 } from 'lucide-react';
 import { GateStatus } from '@/components/GateStatus';
+
+type VerificationState =
+  | 'NOT_QUERIED'
+  | 'PROOF_LOOKUP'
+  | 'NOT_ADMITTED'
+  | 'CC3_UNAVAILABLE'
+  | 'CC3_ADMITTED';
 
 export default function VerifyPage() {
   const [chainKey, setChainKey] = useState<number>(1);
@@ -25,89 +32,62 @@ export default function VerifyPage() {
   const [txIndex, setTxIndex] = useState<number>(42);
   const [txHash, setTxHash] = useState<string>("0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00");
 
-  const [verifying, setVerifying] = useState(false);
+  const [verificationState, setVerificationState] = useState<VerificationState>('NOT_QUERIED');
+  const [currentQueryId, setCurrentQueryId] = useState<string>("");
   const [verifiedProof, setVerifiedProof] = useState<ProofRecord | null>(null);
-  const [proofSource, setProofSource] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [copied, setCopied] = useState(false);
-  const [isAdmittedOnCC3, setIsAdmittedOnCC3] = useState<boolean>(false);
 
   const handleVerify = async () => {
-    setVerifying(true);
+    setVerificationState('PROOF_LOOKUP');
+    setErrorMessage("");
+    setVerifiedProof(null);
     const qId = computeQueryId(chainKey, blockHeight, txIndex);
+    setCurrentQueryId(qId);
 
     try {
       // 1. Authoritative check on Creditcoin CC3 Registry
-      const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_CC3_RPC_URL || 'https://rpc.cc3-testnet.creditcoin.network'
-      );
+      const rpcUrl = process.env.NEXT_PUBLIC_CC3_RPC_URL || 'https://rpc.cc3-testnet.creditcoin.network';
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
       const registry = new ethers.Contract(CONTRACT_ADDRESSES.causoraRegistry, CAUSORA_REGISTRY_ABI, provider);
 
       const hasProcessed = await registry.hasProcessedQuery(qId);
-      setIsAdmittedOnCC3(hasProcessed);
 
-      if (hasProcessed) {
-        const ev = await registry.getEvidence(qId);
-        setVerifiedProof({
-          queryId: qId,
-          chainKey: Number(ev.chainKey),
-          blockHeight: Number(ev.blockHeight),
-          txIndex: Number(ev.txIndex),
-          txHash: ev.txHash,
-          sender: ev.emitter,
-          target: CONTRACT_ADDRESSES.causoraRegistry,
-          value: "0",
-          data: ev.payloadHash,
-          receiptStatus: 1,
-          blockTimestamp: Number(ev.verifiedAt),
-          inclusionVerified: true,
-          continuityVerified: true,
-          blockHash: ev.txHash,
-          verifiedAt: Number(ev.verifiedAt),
-        });
-        setProofSource("Creditcoin CC3 Authoritative Registry (On-Chain)");
-      } else {
-        // Query computed canonically; ready for admission
-        setVerifiedProof({
-          queryId: qId,
-          chainKey,
-          blockHeight,
-          txIndex,
-          txHash,
-          sender: "0x4b70C8885b54E4e3A16A99E57A779C64005bFc98",
-          target: CONTRACT_ADDRESSES.causoraRegistry,
-          value: "0",
-          data: "0xd0e30db0",
-          receiptStatus: 1,
-          blockTimestamp: Math.floor(Date.now() / 1000) - 60,
-          inclusionVerified: true,
-          continuityVerified: true,
-          blockHash: ethers.keccak256(ethers.toUtf8Bytes(`BlockHeader-${blockHeight}`)),
-          verifiedAt: Math.floor(Date.now() / 1000),
-        });
-        setProofSource("Canonical Attestcoin ASC Assembly (Ready for CC3 Admission)");
+      if (!hasProcessed) {
+        // Query computed canonically; NOT admitted to CC3 registry -> NOT VERIFIED
+        setVerificationState('NOT_ADMITTED');
+        return;
       }
-    } catch (err) {
-      console.warn("RPC read error, computed canonical coordinates locally:", err);
+
+      const ev = await registry.getEvidence(qId);
+      if (!ev.exists) {
+        setVerificationState('NOT_ADMITTED');
+        return;
+      }
+
+      // 2. Real on-chain proof record from CC3 registry
       setVerifiedProof({
         queryId: qId,
-        chainKey,
-        blockHeight,
-        txIndex,
-        txHash,
-        sender: "0x4b70C8885b54E4e3A16A99E57A779C64005bFc98",
+        chainKey: Number(ev.chainKey),
+        blockHeight: Number(ev.blockHeight),
+        txIndex: Number(ev.txIndex),
+        txHash: ev.txHash,
+        sender: ev.emitter,
         target: CONTRACT_ADDRESSES.causoraRegistry,
         value: "0",
-        data: "0xd0e30db0",
+        data: ev.payloadHash,
         receiptStatus: 1,
-        blockTimestamp: Math.floor(Date.now() / 1000),
+        blockTimestamp: Number(ev.verifiedAt),
         inclusionVerified: true,
         continuityVerified: true,
-        blockHash: ethers.keccak256(ethers.toUtf8Bytes(`LocalBlock-${blockHeight}`)),
-        verifiedAt: Math.floor(Date.now() / 1000),
+        blockHash: ev.txHash,
+        verifiedAt: Number(ev.verifiedAt),
       });
-      setProofSource("Local Cryptographic Computation");
-    } finally {
-      setVerifying(false);
+      setVerificationState('CC3_ADMITTED');
+    } catch (err: any) {
+      console.error("CC3 RPC verification failure:", err);
+      setErrorMessage(err.message || "Failed to connect to Creditcoin CC3 Testnet RPC");
+      setVerificationState('CC3_UNAVAILABLE');
     }
   };
 
@@ -124,9 +104,9 @@ export default function VerifyPage() {
       setBlockHeight(p.blockHeight);
       setTxIndex(p.txIndex);
       setTxHash(p.txHash);
-      setVerifiedProof(p);
-      setProofSource("Local Lab Fixture Preset");
-      setIsAdmittedOnCC3(false);
+      setVerificationState('NOT_QUERIED');
+      setVerifiedProof(null);
+      setCurrentQueryId(computeQueryId(p.chainKey, p.blockHeight, p.txIndex));
     }
   };
 
@@ -142,14 +122,14 @@ export default function VerifyPage() {
           Cryptographic Proof Verifier
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 max-w-2xl">
-          Inspect foreign transaction coordinates and verify inclusion proofs against Creditcoin 3&apos;s native BlockProver (`0x0000000000000000000000000000000000000FD2`) and ChainInfo (`0xFD3`) precompiles.
+          Inspect foreign transaction coordinates and verify inclusion proofs against Creditcoin 3&apos;s authoritative on-chain Registry (`{CONTRACT_ADDRESSES.causoraRegistry}`) and native BlockProver (`0x0000000000000000000000000000000000000FD2`) precompile.
         </p>
       </div>
 
       {/* Preset Selectors */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
         <div className="flex items-center gap-2">
-          <span className="text-slate-400">Sample Presets:</span>
+          <span className="text-slate-400">Sample Coordinates:</span>
           <button
             onClick={() => loadPreset("proof_dep_1")}
             className="px-2.5 py-1 rounded bg-surface hover:bg-surface-subtle border border-surface-border text-slate-300 transition-all"
@@ -183,7 +163,10 @@ export default function VerifyPage() {
               <label className="block text-slate-400 mb-1">Source Chain</label>
               <select
                 value={chainKey}
-                onChange={(e) => setChainKey(Number(e.target.value))}
+                onChange={(e) => {
+                  setChainKey(Number(e.target.value));
+                  setVerificationState('NOT_QUERIED');
+                }}
                 className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono"
               >
                 <option value={1}>Ethereum Sepolia (ChainKey: 1)</option>
@@ -198,7 +181,10 @@ export default function VerifyPage() {
                 <input
                   type="number"
                   value={blockHeight}
-                  onChange={(e) => setBlockHeight(Number(e.target.value))}
+                  onChange={(e) => {
+                    setBlockHeight(Number(e.target.value));
+                    setVerificationState('NOT_QUERIED');
+                  }}
                   className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono"
                 />
               </div>
@@ -207,7 +193,10 @@ export default function VerifyPage() {
                 <input
                   type="number"
                   value={txIndex}
-                  onChange={(e) => setTxIndex(Number(e.target.value))}
+                  onChange={(e) => {
+                    setTxIndex(Number(e.target.value));
+                    setVerificationState('NOT_QUERIED');
+                  }}
                   className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono"
                 />
               </div>
@@ -218,7 +207,10 @@ export default function VerifyPage() {
               <input
                 type="text"
                 value={txHash}
-                onChange={(e) => setTxHash(e.target.value)}
+                onChange={(e) => {
+                  setTxHash(e.target.value);
+                  setVerificationState('NOT_QUERIED');
+                }}
                 className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono text-[11px]"
               />
             </div>
@@ -226,18 +218,18 @@ export default function VerifyPage() {
 
           <button
             onClick={handleVerify}
-            disabled={verifying}
+            disabled={verificationState === 'PROOF_LOOKUP'}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all shadow-md disabled:opacity-50 font-sans"
           >
-            {verifying ? (
+            {verificationState === 'PROOF_LOOKUP' ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Reading Creditcoin CC3 Registry...</span>
+                <span>Querying Creditcoin CC3 Registry...</span>
               </>
             ) : (
               <>
                 <FileSearch className="w-3.5 h-3.5" />
-                <span>Verify Merkle &amp; Continuity Proof</span>
+                <span>Verify on Creditcoin CC3</span>
               </>
             )}
           </button>
@@ -245,15 +237,87 @@ export default function VerifyPage() {
 
         {/* Verification Result Inspector */}
         <div className="lg:col-span-7 space-y-4">
-          {verifiedProof ? (
+          {verificationState === 'PROOF_LOOKUP' && (
+            <div className="p-12 rounded-2xl bg-surface border border-surface-border text-center space-y-3">
+              <RefreshCw className="w-8 h-8 mx-auto text-blue-400 animate-spin" />
+              <div className="text-sm font-bold text-white font-display">Querying Creditcoin CC3...</div>
+              <p className="text-xs text-slate-400 font-mono">
+                Checking CausoraRegistry on-chain state for queryId: {currentQueryId || computeQueryId(chainKey, blockHeight, txIndex)}
+              </p>
+            </div>
+          )}
+
+          {verificationState === 'CC3_UNAVAILABLE' && (
+            <div className="p-6 rounded-2xl bg-surface border border-rose-500/30 space-y-4 animate-in fade-in duration-300">
+              <div className="flex items-center gap-2 text-rose-400">
+                <XCircle className="w-5 h-5" />
+                <h3 className="text-base font-bold font-display">CC3 UNAVAILABLE</h3>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Could not connect to Creditcoin CC3 Testnet RPC (`https://rpc.cc3-testnet.creditcoin.network`).
+              </p>
+              {errorMessage && (
+                <div className="p-3 rounded-lg bg-rose-950/30 border border-rose-500/20 text-xs font-mono text-rose-300 break-all">
+                  {errorMessage}
+                </div>
+              )}
+              <p className="text-[11px] text-slate-400 font-mono">
+                Verification failed closed. The protocol never assumes validity when RPC connectivity is unavailable.
+              </p>
+            </div>
+          )}
+
+          {verificationState === 'NOT_ADMITTED' && (
+            <div className="p-6 rounded-2xl bg-surface border border-amber-500/30 space-y-4 animate-in fade-in duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-surface-border pb-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-base font-bold text-white font-display">NOT VERIFIED / READY FOR ADMISSION</h3>
+                </div>
+                <span className="text-[11px] font-mono text-amber-400 bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                  Unprocessed on CC3
+                </span>
+              </div>
+
+              {/* Canonical Query ID Box */}
+              <div className="p-3.5 rounded-xl bg-surface-subtle border border-surface-border space-y-1">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>Canonical 72-Byte Packed Query ID:</span>
+                  <button
+                    onClick={() => handleCopyQueryId(currentQueryId)}
+                    className="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-mono text-[11px]"
+                  >
+                    {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copied ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
+                <div className="font-mono text-blue-400 text-xs break-all bg-surface p-2 rounded border border-surface-border">
+                  {currentQueryId}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs text-amber-200 leading-relaxed font-mono space-y-2">
+                <p>
+                  <strong>On-Chain Verification Status:</strong> Not found in CausoraRegistry on CC3.
+                </p>
+                <p className="text-slate-400 text-[11px]">
+                  This query coordinate has not been admitted via <code>admitEvidence</code> on Creditcoin CC3. Without an admitted Attestcoin proof and BlockProver verification, the protocol treats this event as unverified and unprovable.
+                </p>
+              </div>
+
+              <GateStatus gate1Passed={false} gate2Passed={false} gate3Passed={false} gate4Action="REJECT" />
+            </div>
+          )}
+
+          {verificationState === 'CC3_ADMITTED' && verifiedProof && (
             <div className="p-6 rounded-2xl bg-surface border border-surface-border space-y-5 animate-in fade-in duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-surface-border pb-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  <h3 className="text-base font-bold text-white font-display">Proof Inclusion Verified</h3>
+                  <h3 className="text-base font-bold text-white font-display">Proof Admitted &amp; Verified</h3>
                 </div>
                 <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                  {proofSource}
+                  Creditcoin CC3 On-Chain Registry
                 </span>
               </div>
 
@@ -276,18 +340,18 @@ export default function VerifyPage() {
 
               {/* Status on CC3 */}
               <div className="p-3 rounded-lg bg-surface-subtle border border-surface-border flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">Creditcoin CC3 Admission Status:</span>
-                <span className={isAdmittedOnCC3 ? "text-emerald-400 font-bold" : "text-amber-400"}>
-                  {isAdmittedOnCC3 ? "ADMITTED IN CC3 REGISTRY" : "UNPROCESSED ON CC3 (ELIGIBLE)"}
+                <span className="text-slate-400">Creditcoin CC3 Registry Status:</span>
+                <span className="text-emerald-400 font-bold">
+                  ADMITTED &amp; VERIFIED ON CC3
                 </span>
               </div>
 
               {/* Decoded Transaction Payload */}
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-slate-300">Decoded Receipt Payload</h4>
+                <h4 className="text-xs font-semibold text-slate-300">Authoritative On-Chain Evidence</h4>
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                   <div className="p-2.5 rounded bg-surface-subtle border border-surface-border">
-                    <span className="text-[10px] text-slate-500 block">Sender / Emitter</span>
+                    <span className="text-[10px] text-slate-500 block">Emitter Address</span>
                     <span className="text-slate-200 truncate block text-[11px]">{verifiedProof.sender}</span>
                   </div>
                   <div className="p-2.5 rounded bg-surface-subtle border border-surface-border">
@@ -295,22 +359,24 @@ export default function VerifyPage() {
                     <span className="text-slate-200 truncate block text-[11px]">{verifiedProof.target}</span>
                   </div>
                   <div className="p-2.5 rounded bg-surface-subtle border border-surface-border">
-                    <span className="text-[10px] text-slate-500 block">Receipt Status</span>
-                    <span className="text-emerald-400 font-bold">{verifiedProof.receiptStatus === 1 ? "1 (SUCCESS)" : "0 (REVERT)"}</span>
+                    <span className="text-[10px] text-slate-500 block">Evidence Payload Hash</span>
+                    <span className="text-slate-300 truncate block text-[11px]">{verifiedProof.data}</span>
                   </div>
                   <div className="p-2.5 rounded bg-surface-subtle border border-surface-border">
-                    <span className="text-[10px] text-slate-500 block">Block Header Hash</span>
-                    <span className="text-slate-300 truncate block text-[11px]">{verifiedProof.blockHash}</span>
+                    <span className="text-[10px] text-slate-500 block">Verified Block Height</span>
+                    <span className="text-emerald-400 font-bold">{verifiedProof.blockHeight}</span>
                   </div>
                 </div>
               </div>
 
               <GateStatus gate1Passed={true} gate2Passed={true} gate3Passed={true} gate4Action="ACT" />
             </div>
-          ) : (
+          )}
+
+          {verificationState === 'NOT_QUERIED' && (
             <div className="p-12 rounded-2xl bg-surface border border-surface-border text-center space-y-2 text-slate-500 text-xs font-mono">
               <FileSearch className="w-8 h-8 mx-auto text-slate-600" />
-              <p>Enter transaction coordinates or select a sample above to verify on Creditcoin CC3.</p>
+              <p>Enter foreign transaction coordinates above and click &quot;Verify on Creditcoin CC3&quot; to inspect authoritative on-chain state.</p>
             </div>
           )}
         </div>

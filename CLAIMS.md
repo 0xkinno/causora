@@ -20,12 +20,12 @@
 | **Cross-Chain Causal Witness Verification** | `LOCAL` | `tests/unit/RelationEngine.test.ts` | Formally proven when cryptographic parentDigest and capability hash match |
 | **Fail-Closed Cross-Chain HOLD on Indeterminate Ordering** | `LOCAL` | `tests/attacks/AdversarialAttacks.test.ts` | Formally proven: independent chains without witness return HOLD |
 | **Replay Protection on Admitted Evidence** | `LOCAL` | `tests/invariant/OrderabilityInvariants.test.ts` | Formally proven: queryId processed bitmap prevents second admission |
-| **18 Adversarial Attack Defenses** | `LOCAL` | `tests/attacks/AdversarialAttacks.test.ts` | 18 vector test suite passing in Hardhat |
-| **Lending Position Collateral Race Resolution** | `LOCAL` | `tests/unit/LendingPositionManager.test.ts` | Position transitions to RESCUED, LIQUIDATED, or HELD strictly via guard |
+| **27 Adversarial Attack Defenses** | `LOCAL` | `tests/attacks/AdversarialAttacks.test.ts` | 27 vector comprehensive attack test suite passing in Hardhat |
+| **Lending Position Collateral Race Resolution** | `LIVE` | `deployments/cc3-testnet.json`, `evidence/judging/final-cc3-e2e.json` | LendingPositionManager and CausoraVault wired and verified on CC3 |
 | **Frontend Wallet Connection** | `LOCAL` | `site/components/Navbar.tsx` (Wagmi + Viem) | Connecting via injected provider to CC3 Testnet |
-| **Live CC3 Proof Verification** | `UNVERIFIED` | Pending Phase 3 deployment & Phase 5 execution | Will be upgraded to `LIVE` upon contract deployment & test receipt |
-| **Live Source Collateral Race Execution** | `UNVERIFIED` | Pending Phase 5 execution | Will be upgraded to `LIVE` upon testnet execution |
-| **Gas Benchmark Measurements** | `LOCAL` | `evidence/gas-results.json` | Measured via Hardhat gas reporter |
+| **Live CC3 Proof Verification** | `LIVE` | `evidence/judging/final-cc3-e2e.json` | Precompile enforcement and evidence admission verified on CC3 |
+| **Live Source Collateral Race Execution** | `LIVE` | `evidence/judging/final-cc3-e2e.json` | Real CC3 testnet execution with collateral vault locking |
+| **Gas Benchmark Measurements** | `LIVE` | `deployments/cc3-testnet.json`, `evidence/gas-results.json` | Measured from actual CC3 testnet transaction receipts |
 | **Cross-Chain Latency Profile** | `OFFCHAIN` | `evidence/proof-latency.json` | Telemetry from Attestcoin proof generation & block times |
 
 ---

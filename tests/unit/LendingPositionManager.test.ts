@@ -171,9 +171,25 @@ describe("LendingPositionManager & CausoraVault Integration", function () {
     // Vault state must be held
     expect(await vault.isHeld(posId)).to.equal(true);
 
-    // Later liquidation while held MUST revert
+    // Direct call to vault must revert with UnauthorizedCaller
     await expect(
       vault.executeProtectedTransition(
+        posId,
+        2, // ALLOW_B
+        liquidator.address,
+        borrower.address,
+        collateralAmt
+      )
+    ).to.be.revertedWithCustomError(vault, "UnauthorizedCaller");
+
+    // Later liquidation call from positionManager on held position reverts with PositionIsHeld
+    const lendingSigner = await ethers.getImpersonatedSigner(await lending.getAddress());
+    await ethers.provider.send("hardhat_setBalance", [
+      await lending.getAddress(),
+      "0x1000000000000000000",
+    ]);
+    await expect(
+      vault.connect(lendingSigner).executeProtectedTransition(
         posId,
         2, // ALLOW_B
         liquidator.address,
@@ -183,7 +199,7 @@ describe("LendingPositionManager & CausoraVault Integration", function () {
     ).to.be.revertedWithCustomError(vault, "PositionIsHeld");
   });
 
-  it("enforces business-level replay protection", async function () {
+  it("enforces multi-dimensional business-level replay protection", async function () {
     const posId = 303n;
     await lending.connect(borrower).createPosition(posId, borrower.address, ethers.parseEther("5"), ethers.parseEther("2000"));
     await lending.markAtRisk(posId);
@@ -196,7 +212,7 @@ describe("LendingPositionManager & CausoraVault Integration", function () {
     await registry.admitEvidence(3n, 20000000n, pB.encodedTx, pB.merkleProof, pB.continuityProof);
     const qB = await registry.computeQueryId(3n, 20000000n, pB.merkleProof.root, pB.merkleProof.siblings);
 
-    // First execution succeeds
+    // First execution succeeds -> transitions to HELD
     await lending.resolveCollateralRace(
       posId,
       qA,
@@ -206,7 +222,7 @@ describe("LendingPositionManager & CausoraVault Integration", function () {
       liquidator.address
     );
 
-    // Second execution with same action key reverts with BusinessActionAlreadyConsumed
+    // Dimension 1: Same position, same evidence -> BusinessActionAlreadyConsumed
     await expect(
       lending.resolveCollateralRace(
         posId,
@@ -217,9 +233,26 @@ describe("LendingPositionManager & CausoraVault Integration", function () {
         liquidator.address
       )
     ).to.be.revertedWithCustomError(lending, "BusinessActionAlreadyConsumed");
+
+    // Dimension 2: Cross-position evidence binding reuse
+    const posId2 = 304n;
+    await lending.connect(borrower).createPosition(posId2, borrower.address, ethers.parseEther("5"), ethers.parseEther("2000"));
+    await lending.markAtRisk(posId2);
+
+    // Reusing qA on another position MUST revert with EvidenceBoundToOtherPosition
+    await expect(
+      lending.resolveCollateralRace(
+        posId2,
+        qA,
+        qB,
+        CausalWitnessBuilder.empty(),
+        ethers.parseEther("1"),
+        liquidator.address
+      )
+    ).to.be.revertedWithCustomError(lending, "EvidenceBoundToOtherPosition");
   });
 
-  it("ALLOW_B produces real ERC20 transfer to liquidator", async function () {
+  it("ALLOW_B produces real ERC20 transfer to liquidator and updates Vault accounting", async function () {
     const posId = 404n;
     const collateralAmt = ethers.parseEther("10");
 
@@ -227,6 +260,9 @@ describe("LendingPositionManager & CausoraVault Integration", function () {
     await ctUSD.mint(borrower.address, collateralAmt);
     await ctUSD.connect(borrower).approve(await vault.getAddress(), collateralAmt);
     await vault.connect(borrower).depositCollateral(posId, collateralAmt);
+
+    expect(await vault.lockedCollateral(posId)).to.equal(collateralAmt);
+    expect(await ctUSD.balanceOf(await vault.getAddress())).to.equal(collateralAmt);
 
     // Position on same chain where liquidation event is PROVABLY earlier
     await lending.connect(borrower).createPosition(posId, borrower.address, collateralAmt, ethers.parseEther("5000"));
@@ -259,9 +295,10 @@ describe("LendingPositionManager & CausoraVault Integration", function () {
     const qLiq = await registry.computeQueryId(1n, 100n, proofLiq.root, proofLiq.siblings);
 
     const initialLiquidatorBalance = await ctUSD.balanceOf(liquidator.address);
+    const initialVaultBalance = await ctUSD.balanceOf(await vault.getAddress());
 
     // Resolve race: Rescue (height 200) vs Liq (height 100) -> ALLOW_B (provably first B)
-    await lending.resolveCollateralRace(
+    const tx = await lending.resolveCollateralRace(
       posId,
       qRescue,
       qLiq,
@@ -270,8 +307,16 @@ describe("LendingPositionManager & CausoraVault Integration", function () {
       liquidator.address
     );
 
+    await expect(tx)
+      .to.emit(vault, "VaultCollateralReleased")
+      .withArgs(posId, liquidator.address, collateralAmt);
+
     const finalLiquidatorBalance = await ctUSD.balanceOf(liquidator.address);
+    const finalVaultBalance = await ctUSD.balanceOf(await vault.getAddress());
+
     expect(finalLiquidatorBalance - initialLiquidatorBalance).to.equal(collateralAmt);
+    expect(initialVaultBalance - finalVaultBalance).to.equal(collateralAmt);
+    expect(await vault.lockedCollateral(posId)).to.equal(0n);
 
     const pos = await lending.getPosition(posId);
     expect(pos.state).to.equal(5); // LIQUIDATED

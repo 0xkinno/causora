@@ -27,6 +27,15 @@ interface ICausoraGuard {
         string reason
     );
 
+    event PolicyEvaluatedWithNonce(
+        uint256 indexed positionId,
+        uint256 indexed nonce,
+        bytes32 indexed evidenceA,
+        bytes32 evidenceB,
+        GuardDecision decision,
+        string reason
+    );
+
     function evaluateGuardFromEvidence(
         uint256 positionId,
         bytes32 queryIdA,
@@ -35,9 +44,6 @@ interface ICausoraGuard {
         ActionPolicy policy
     ) external returns (GuardDecision decision, IRelationEngine.RelationResult memory relation);
 
-    function evaluateGuard(
-        uint256 positionId,
-        IRelationEngine.RelationResult calldata relation,
-        ActionPolicy policy
-    ) external returns (GuardDecision decision);
+    function positionDecisionNonces(uint256 positionId) external view returns (uint256);
+    function MAX_EVIDENCE_AGE() external view returns (uint256);
 }

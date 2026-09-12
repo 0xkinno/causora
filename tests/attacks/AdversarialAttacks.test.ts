@@ -13,7 +13,7 @@ import {
 import { CausalWitnessBuilder } from "../../src/witness/causal-witness";
 import { ActionPolicy, GuardDecision } from "../../src/policy/guard-rules";
 
-describe("Adversarial Attack Suite (18 Vectors)", function () {
+describe("Adversarial Attack Suite (27 Vectors)", function () {
   let mockProver: MockBlockProver;
   let registry: CausoraRegistry;
   let relationEngine: RelationEngine;
@@ -391,25 +391,272 @@ describe("Adversarial Attack Suite (18 Vectors)", function () {
 
   // Attack 18: Financial action attempted on INDETERMINATE (The core firewall test)
   it("Attack 18: Financial action MUST fail closed to HOLD when relation is INDETERMINATE", async function () {
-    const relationIndeterminate = {
-      classification: 3, // CROSS_CHAIN_INDETERMINATE
-      order: 0, // UNPROVABLE
-      heightA: 100n,
-      indexA: 1n,
-      heightB: 20000000n,
-      indexB: 10n,
-      evidenceDigestA: ethers.keccak256(ethers.toUtf8Bytes("A")),
-      evidenceDigestB: ethers.keccak256(ethers.toUtf8Bytes("B")),
-      reason: "Order unprovable across independent chains",
-    };
+    const encSepolia = makeEncodedTx(1, emitterSepolia, defaultSig);
+    const encMainnet = makeEncodedTx(1, emitterMainnet, defaultSig);
 
-    const decision = await guard.evaluateGuard.staticCall(
+    const proof1 = { root: ethers.keccak256(ethers.toUtf8Bytes("root1")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s1")), isLeft: false }] };
+    const proof2 = { root: ethers.keccak256(ethers.toUtf8Bytes("root2")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s2")), isLeft: true }] };
+    const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
+
+    await registry.admitEvidence(1n, 100n, encSepolia, proof1, cont);
+    const q1 = await registry.computeQueryId(1n, 100n, proof1.root, proof1.siblings);
+
+    await registry.admitEvidence(3n, 20000000n, encMainnet, proof2, cont);
+    const q2 = await registry.computeQueryId(3n, 20000000n, proof2.root, proof2.siblings);
+
+    const [decision] = await guard.evaluateGuardFromEvidence.staticCall(
       999n,
-      relationIndeterminate,
+      q1,
+      q2,
+      CausalWitnessBuilder.empty(),
       ActionPolicy.FailClosedHold
     );
 
     // MUST NOT allow liquidation or arbitrary state change; MUST be HOLD
     expect(decision).to.equal(GuardDecision.HOLD);
+  });
+
+  // Attack 19: Forged Causal Witness — Random Signature / Capability
+  it("Attack 19: Forged Causal Witness with random capability returns CROSS_CHAIN_INDETERMINATE", async function () {
+    const evA = {
+      chainKey: 1n,
+      blockHeight: 100n,
+      txIndex: 0n,
+      txHash: ethers.keccak256(ethers.toUtf8Bytes("txA19")),
+      emitter: emitterSepolia,
+      eventSig: defaultSig,
+      queryId: ethers.keccak256(ethers.toUtf8Bytes("qA19")),
+      payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA19")),
+      verifiedAt: 100n,
+      exists: true
+    };
+    const validWitness = CausalWitnessBuilder.createWitness(1, 100, evA.queryId, evA.payloadHash, 1);
+    const { payloadHash: payloadHashB, eventSig: sigB } = CausalWitnessBuilder.createConsumptionPayload(validWitness);
+    const evB = {
+      ...evA,
+      chainKey: 3n,
+      blockHeight: 50n,
+      eventSig: sigB,
+      payloadHash: payloadHashB
+    };
+
+    // Attacker fabricates random capability
+    const forgedWitness = {
+      ...validWitness,
+      capabilityHash: ethers.keccak256(ethers.toUtf8Bytes("forged-capability"))
+    };
+
+    const res = await relationEngine.classifyRelation(toPlainEvidence(evA), toPlainEvidence(evB), forgedWitness);
+    expect(res.classification).to.equal(3); // CROSS_CHAIN_INDETERMINATE
+  });
+
+  // Attack 20: Causal Witness with Wrong Parent Digest
+  it("Attack 20: Causal Witness with wrong parentDigest is rejected as INDETERMINATE", async function () {
+    const evA = {
+      chainKey: 1n,
+      blockHeight: 100n,
+      txIndex: 0n,
+      txHash: ethers.keccak256(ethers.toUtf8Bytes("txA20")),
+      emitter: emitterSepolia,
+      eventSig: defaultSig,
+      queryId: ethers.keccak256(ethers.toUtf8Bytes("qA20")),
+      payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA20")),
+      verifiedAt: 100n,
+      exists: true
+    };
+    const validWitness = CausalWitnessBuilder.createWitness(1, 100, evA.queryId, evA.payloadHash, 1);
+    const { payloadHash: payloadHashB, eventSig: sigB } = CausalWitnessBuilder.createConsumptionPayload(validWitness);
+    const evB = {
+      ...evA,
+      chainKey: 3n,
+      blockHeight: 50n,
+      eventSig: sigB,
+      payloadHash: payloadHashB
+    };
+
+    const badParentWitness = {
+      ...validWitness,
+      parentDigest: ethers.keccak256(ethers.toUtf8Bytes("completely-wrong-parent"))
+    };
+
+    const res = await relationEngine.classifyRelation(toPlainEvidence(evA), toPlainEvidence(evB), badParentWitness);
+    expect(res.classification).to.equal(3); // CROSS_CHAIN_INDETERMINATE
+  });
+
+  // Attack 21: Causal Witness with Wrong Sequence (sequence <= 0 or uninitialized)
+  it("Attack 21: Causal Witness with zero/invalid sequence is rejected as INDETERMINATE", async function () {
+    const evA = {
+      chainKey: 1n,
+      blockHeight: 100n,
+      txIndex: 0n,
+      txHash: ethers.keccak256(ethers.toUtf8Bytes("txA21")),
+      emitter: emitterSepolia,
+      eventSig: defaultSig,
+      queryId: ethers.keccak256(ethers.toUtf8Bytes("qA21")),
+      payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA21")),
+      verifiedAt: 100n,
+      exists: true
+    };
+    const validWitness = CausalWitnessBuilder.createWitness(1, 100, evA.queryId, evA.payloadHash, 1);
+    const { payloadHash: payloadHashB, eventSig: sigB } = CausalWitnessBuilder.createConsumptionPayload(validWitness);
+    const evB = {
+      ...evA,
+      chainKey: 3n,
+      blockHeight: 50n,
+      eventSig: sigB,
+      payloadHash: payloadHashB
+    };
+
+    const badSeqWitness = {
+      ...validWitness,
+      sequenceNumber: 0n // Invalid non-positive sequence
+    };
+
+    const res = await relationEngine.classifyRelation(toPlainEvidence(evA), toPlainEvidence(evB), badSeqWitness);
+    expect(res.classification).to.equal(3); // CROSS_CHAIN_INDETERMINATE
+  });
+
+  // Attack 22: Causal Witness with Wrong State Commitment
+  it("Attack 22: Causal Witness with wrong stateCommitment is rejected as INDETERMINATE", async function () {
+    const evA = {
+      chainKey: 1n,
+      blockHeight: 100n,
+      txIndex: 0n,
+      txHash: ethers.keccak256(ethers.toUtf8Bytes("txA22")),
+      emitter: emitterSepolia,
+      eventSig: defaultSig,
+      queryId: ethers.keccak256(ethers.toUtf8Bytes("qA22")),
+      payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA22")),
+      verifiedAt: 100n,
+      exists: true
+    };
+    const validWitness = CausalWitnessBuilder.createWitness(1, 100, evA.queryId, evA.payloadHash, 1);
+    const { payloadHash: payloadHashB, eventSig: sigB } = CausalWitnessBuilder.createConsumptionPayload(validWitness);
+    const evB = {
+      ...evA,
+      chainKey: 3n,
+      blockHeight: 50n,
+      eventSig: sigB,
+      payloadHash: payloadHashB
+    };
+
+    const badCommitWitness = {
+      ...validWitness,
+      stateCommitment: ethers.keccak256(ethers.toUtf8Bytes("unmatched-state-commitment"))
+    };
+
+    const res = await relationEngine.classifyRelation(toPlainEvidence(evA), toPlainEvidence(evB), badCommitWitness);
+    expect(res.classification).to.equal(3); // CROSS_CHAIN_INDETERMINATE
+  });
+
+  // Attack 23: Causal Witness Reused Across Different Positions
+  it("Attack 23: Reusing evidence/witness across different positions is rejected by LendingPositionManager", async function () {
+    const posId1 = 501n;
+    const posId2 = 502n;
+
+    await lending.connect(victim).createPosition(posId1, victim.address, ethers.parseEther("5"), ethers.parseEther("2000"));
+    await lending.connect(victim).createPosition(posId2, victim.address, ethers.parseEther("5"), ethers.parseEther("2000"));
+    await lending.markAtRisk(posId1);
+    await lending.markAtRisk(posId2);
+
+    const encSepolia = makeEncodedTx(1, emitterSepolia, defaultSig);
+    const encMainnet = makeEncodedTx(1, emitterMainnet, defaultSig);
+    const proof1 = { root: ethers.keccak256(ethers.toUtf8Bytes("root23a")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s23a")), isLeft: false }] };
+    const proof2 = { root: ethers.keccak256(ethers.toUtf8Bytes("root23b")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s23b")), isLeft: true }] };
+    const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
+
+    await registry.admitEvidence(1n, 100n, encSepolia, proof1, cont);
+    const q1 = await registry.computeQueryId(1n, 100n, proof1.root, proof1.siblings);
+    await registry.admitEvidence(3n, 20000000n, encMainnet, proof2, cont);
+    const q2 = await registry.computeQueryId(3n, 20000000n, proof2.root, proof2.siblings);
+
+    // Resolve for Position 1
+    await lending.resolveCollateralRace(
+      posId1,
+      q1,
+      q2,
+      CausalWitnessBuilder.empty(),
+      ethers.parseEther("1"),
+      attacker.address
+    );
+
+    // Attempt to reuse the same evidence on Position 2 MUST revert with EvidenceBoundToOtherPosition
+    await expect(
+      lending.resolveCollateralRace(
+        posId2,
+        q1,
+        q2,
+        CausalWitnessBuilder.empty(),
+        ethers.parseEther("1"),
+        attacker.address
+      )
+    ).to.be.revertedWithCustomError(lending, "EvidenceBoundToOtherPosition");
+  });
+
+  // Attack 24: Event B Payload Does NOT Contain Causal Witness Reference
+  it("Attack 24: Event B payload missing causal witness reference is rejected as INDETERMINATE", async function () {
+    const evA = {
+      chainKey: 1n,
+      blockHeight: 100n,
+      txIndex: 0n,
+      txHash: ethers.keccak256(ethers.toUtf8Bytes("txA24")),
+      emitter: emitterSepolia,
+      eventSig: defaultSig,
+      queryId: ethers.keccak256(ethers.toUtf8Bytes("qA24")),
+      payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA24")),
+      verifiedAt: 100n,
+      exists: true
+    };
+    const validWitness = CausalWitnessBuilder.createWitness(1, 100, evA.queryId, evA.payloadHash, 1);
+    const evB = {
+      ...evA,
+      chainKey: 3n,
+      blockHeight: 50n,
+      eventSig: ethers.keccak256(ethers.toUtf8Bytes("CausalityConsumed(bytes32,bytes32,uint64,bytes32)")),
+      payloadHash: ethers.keccak256(ethers.toUtf8Bytes("completely-unrelated-payload-hash"))
+    };
+
+    const res = await relationEngine.classifyRelation(toPlainEvidence(evA), toPlainEvidence(evB), validWitness);
+    expect(res.classification).to.equal(3); // CROSS_CHAIN_INDETERMINATE
+  });
+
+  // Attack 25: Event B Emitter is NOT Authorized Cross-Chain Counterparty
+  it("Attack 25: Unregistered emitter attempting evidence admission is rejected", async function () {
+    const unapprovedEmitter = "0x9999999999999999999999999999999999999999";
+    const encUnapproved = makeEncodedTx(1, unapprovedEmitter, defaultSig);
+    const proof = { root: ethers.keccak256(ethers.toUtf8Bytes("root25")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s25")), isLeft: false }] };
+    const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
+
+    await expect(
+      registry.admitEvidence(1n, 100n, encUnapproved, proof, cont)
+    ).to.be.revertedWithCustomError(registry, "SourceNotRegistered");
+  });
+
+  // Attack 26: Guard Direct Call with Fabricated RelationResult Reverts at Compile/Runtime
+  it("Attack 26: Guard direct call with fabricated RelationResult is rejected because evaluateGuard is not public", async function () {
+    expect((guard as any).evaluateGuard).to.be.undefined;
+
+    // Direct low-level call with legacy evaluateGuard selector MUST fail
+    const fakeSelector = ethers.id("evaluateGuard(uint256,(uint8,uint8,uint64,uint64,uint64,uint64,bytes32,bytes32,string),uint8)").slice(0, 10);
+    const dummyCalldata = fakeSelector + "00".repeat(64);
+    await expect(
+      owner.sendTransaction({
+        to: await guard.getAddress(),
+        data: dummyCalldata
+      })
+    ).to.be.reverted;
+  });
+
+  // Attack 27: Vault Direct Call by Owner Reverts
+  it("Attack 27: Vault direct call to executeProtectedTransition by owner reverts with UnauthorizedCaller", async function () {
+    await expect(
+      vault.connect(owner).executeProtectedTransition(
+        1001n,
+        2, // ALLOW_B
+        attacker.address,
+        victim.address,
+        ethers.parseEther("1")
+      )
+    ).to.be.revertedWithCustomError(vault, "UnauthorizedCaller");
   });
 });

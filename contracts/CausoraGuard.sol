@@ -19,7 +19,13 @@ contract CausoraGuard is ICausoraGuard {
         registry = ICausoraRegistry(_registry);
     }
 
+    uint256 public constant override MAX_EVIDENCE_AGE = 7 days;
+    mapping(uint256 => uint256) public override positionDecisionNonces;
+
+    error EvidenceNotFound(bytes32 queryId);
+
     /// @notice Evaluates a financial guard policy against authoritative evidence in the registry
+    /// @dev Sole public entrypoint; external callers cannot supply a fabricated RelationResult
     /// @param positionId Monitored position ID
     /// @param queryIdA Admitted evidence query ID for Event A
     /// @param queryIdB Admitted evidence query ID for Event B
@@ -35,23 +41,91 @@ contract CausoraGuard is ICausoraGuard {
         ICausoraRegistry.EventEvidence memory evidenceA = registry.getEvidence(queryIdA);
         ICausoraRegistry.EventEvidence memory evidenceB = registry.getEvidence(queryIdB);
 
+        uint256 nonce = ++positionDecisionNonces[positionId];
+
+        // 1. Evidence Existence Check
+        if (!evidenceA.exists || !evidenceB.exists) {
+            decision = GuardDecision.REJECT;
+            relation = relationEngine.classifyRelation(evidenceA, evidenceB, witness);
+            emit PolicyEvaluated(
+                positionId,
+                queryIdA,
+                queryIdB,
+                decision,
+                "One or both evidence query IDs not found in registry"
+            );
+            emit PolicyEvaluatedWithNonce(
+                positionId,
+                nonce,
+                queryIdA,
+                queryIdB,
+                decision,
+                "One or both evidence query IDs not found in registry"
+            );
+            return (decision, relation);
+        }
+
+        // 2. Evidence Freshness Check
+        bool isStale = (block.timestamp > evidenceA.verifiedAt + MAX_EVIDENCE_AGE) ||
+                       (block.timestamp > evidenceB.verifiedAt + MAX_EVIDENCE_AGE);
+
         relation = relationEngine.classifyRelation(evidenceA, evidenceB, witness);
-        decision = evaluateGuard(positionId, relation, policy);
+
+        if (isStale) {
+            if (policy == ActionPolicy.FailClosedHold) {
+                decision = GuardDecision.HOLD;
+                emit PolicyEvaluated(
+                    positionId,
+                    relation.evidenceDigestA,
+                    relation.evidenceDigestB,
+                    decision,
+                    "Evidence is stale: outside max permitted age. Position protected in HOLD state."
+                );
+                emit PolicyEvaluatedWithNonce(
+                    positionId,
+                    nonce,
+                    relation.evidenceDigestA,
+                    relation.evidenceDigestB,
+                    decision,
+                    "Evidence is stale: outside max permitted age. Position protected in HOLD state."
+                );
+                return (decision, relation);
+            } else {
+                decision = GuardDecision.REJECT;
+                emit PolicyEvaluated(
+                    positionId,
+                    relation.evidenceDigestA,
+                    relation.evidenceDigestB,
+                    decision,
+                    "Evidence is stale: outside max permitted age. Action rejected."
+                );
+                emit PolicyEvaluatedWithNonce(
+                    positionId,
+                    nonce,
+                    relation.evidenceDigestA,
+                    relation.evidenceDigestB,
+                    decision,
+                    "Evidence is stale: outside max permitted age. Action rejected."
+                );
+                return (decision, relation);
+            }
+        }
+
+        decision = _evaluateGuardInternal(positionId, nonce, relation, policy);
     }
 
-    /// @notice Evaluates a financial guard policy against the formal relation classification
-    /// @param positionId Monitored position ID
-    /// @param relation The output from RelationEngine
-    /// @param policy The requested guard policy
-    function evaluateGuard(
+    /// @notice Internal guard evaluation policy engine — NOT callable directly by external callers
+    function _evaluateGuardInternal(
         uint256 positionId,
+        uint256 nonce,
         IRelationEngine.RelationResult memory relation,
         ActionPolicy policy
-    ) public override returns (GuardDecision decision) {
+    ) internal returns (GuardDecision decision) {
         // 1. Invalid Evidence -> REJECT
         if (relation.classification == IRelationEngine.RelationClass.INVALID) {
             decision = GuardDecision.REJECT;
             emit PolicyEvaluated(positionId, relation.evidenceDigestA, relation.evidenceDigestB, decision, "Evidence is invalid or unverified");
+            emit PolicyEvaluatedWithNonce(positionId, nonce, relation.evidenceDigestA, relation.evidenceDigestB, decision, "Evidence is invalid or unverified");
             return decision;
         }
 
@@ -59,6 +133,7 @@ contract CausoraGuard is ICausoraGuard {
         if (relation.order == IRelationEngine.RelativeOrder.PROVABLY_FIRST_A) {
             decision = GuardDecision.ALLOW_A;
             emit PolicyEvaluated(positionId, relation.evidenceDigestA, relation.evidenceDigestB, decision, "Action A authorized by cryptographic proof");
+            emit PolicyEvaluatedWithNonce(positionId, nonce, relation.evidenceDigestA, relation.evidenceDigestB, decision, "Action A authorized by cryptographic proof");
             return decision;
         }
 
@@ -66,6 +141,7 @@ contract CausoraGuard is ICausoraGuard {
         if (relation.order == IRelationEngine.RelativeOrder.PROVABLY_FIRST_B) {
             decision = GuardDecision.ALLOW_B;
             emit PolicyEvaluated(positionId, relation.evidenceDigestA, relation.evidenceDigestB, decision, "Action B authorized by cryptographic proof");
+            emit PolicyEvaluatedWithNonce(positionId, nonce, relation.evidenceDigestA, relation.evidenceDigestB, decision, "Action B authorized by cryptographic proof");
             return decision;
         }
 
@@ -75,6 +151,14 @@ contract CausoraGuard is ICausoraGuard {
                 decision = GuardDecision.HOLD;
                 emit PolicyEvaluated(
                     positionId,
+                    relation.evidenceDigestA,
+                    relation.evidenceDigestB,
+                    decision,
+                    "Order indeterminate across independent chains. Position protected in HOLD state."
+                );
+                emit PolicyEvaluatedWithNonce(
+                    positionId,
+                    nonce,
                     relation.evidenceDigestA,
                     relation.evidenceDigestB,
                     decision,
@@ -90,11 +174,20 @@ contract CausoraGuard is ICausoraGuard {
                     decision,
                     "Missing required cryptographic causal witness."
                 );
+                emit PolicyEvaluatedWithNonce(
+                    positionId,
+                    nonce,
+                    relation.evidenceDigestA,
+                    relation.evidenceDigestB,
+                    decision,
+                    "Missing required cryptographic causal witness."
+                );
                 return decision;
             }
         }
 
         decision = GuardDecision.HOLD;
         emit PolicyEvaluated(positionId, relation.evidenceDigestA, relation.evidenceDigestB, decision, "Default fail-closed HOLD policy invoked");
+        emit PolicyEvaluatedWithNonce(positionId, nonce, relation.evidenceDigestA, relation.evidenceDigestB, decision, "Default fail-closed HOLD policy invoked");
     }
 }

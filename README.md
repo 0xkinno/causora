@@ -6,8 +6,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Creditcoin 3](https://img.shields.io/badge/Creditcoin%20CC3-Testnet%20(102031)-emerald)](https://creditcoin.org)
 [![Attestcoin Protocol](https://img.shields.io/badge/Attestcoin-Native%20Precompile%200xFD2-blueviolet)](https://docs.attestcoin.org)
-[![Tests Passing](https://img.shields.io/badge/Tests-29%2F29%20Passing-brightgreen)](./tests)
-[![Attacks Neutralized](https://img.shields.io/badge/Attacks-18%2F18%20Neutralized-success)](./tests/attacks)
+[![Tests Passing](https://img.shields.io/badge/Tests-44%2F44%20Passing-brightgreen)](./tests)
+[![Attacks Neutralized](https://img.shields.io/badge/Attacks-27%2F27%20Neutralized-success)](./tests/attacks)
 
 ---
 
@@ -181,14 +181,16 @@ Every proven fact is decoded on-chain using `EvmV1Decoder`, ensuring that zero c
 
 ## The Financial Guard
 
-`CausoraGuard` acts as an authorization gateway for lending protocols:
+`CausoraGuard` acts as an authoritative financial authorization firewall for lending protocols:
 
 ```solidity
-function evaluateGuard(
+function evaluateGuardFromEvidence(
     uint256 positionId,
-    IRelationEngine.RelationResult calldata relation,
+    bytes32 queryIdA,
+    bytes32 queryIdB,
+    ICausalWitness.CausalWitness calldata witness,
     ActionPolicy policy
-) external returns (GuardDecision decision);
+) external returns (GuardDecision decision, IRelationEngine.RelationResult memory relation);
 ```
 
 ---
@@ -211,13 +213,14 @@ Visit [`/break-it`](https://causora.vercel.app/break-it) (or `http://localhost:3
 | Supported Source Chains | [`evidence/supported-chains.json`](./evidence/supported-chains.json) | **Verified** |
 | Execution Gas Measurements | [`evidence/gas-results.json`](./evidence/gas-results.json) | **Verified** |
 | Pipeline Latency Benchmarks | [`evidence/proof-latency.json`](./evidence/proof-latency.json) | **Verified** |
-| Adversarial Attack Suite | [`evidence/attacks/`](./evidence/attacks/) | **18/18 Neutralized** |
+| Adversarial Attack Suite | [`evidence/attacks/`](./evidence/attacks/) | **27/27 Neutralized** |
+| Live CC3 E2E Ground Truth | [`evidence/judging/final-cc3-e2e.json`](./evidence/judging/final-cc3-e2e.json) | **CC3_E2E_VERIFIED** |
 
 ---
 
 ## Threat Model
 
-See [`docs/THREAT_MODEL.md`](./docs/THREAT_MODEL.md) for full formal verification of all 18 attack vectors.
+See [`docs/THREAT_MODEL.md`](./docs/THREAT_MODEL.md) for full formal verification of all 27 attack vectors.
 
 ---
 
@@ -275,12 +278,12 @@ To ensure complete clarity and auditability, the operational boundaries of the C
 
 | Contract | Address | Network | Explorer / Verification Link |
 |---|---|---|---|
-| **`CausoraVault`** *(Real CC3 Collateral Vault)* | `0x7047D67Ef69F40F9340Fd97EDF79276458238cfe` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x7047D67Ef69F40F9340Fd97EDF79276458238cfe) |
-| **`MockERC20 (ctUSD)`** *(Test Collateral Asset)* | `0x43410D288dFA265A560eb7DfFCa2991fA687d78d` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x43410D288dFA265A560eb7DfFCa2991fA687d78d) |
-| **`CausoraGuard`** *(Financial Policy Firewall)* | `0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5) |
-| **`LendingPositionManager`** *(Protocol Manager)* | `0x33979FFdC1B60cF727A90c043f1EC5CB15f6BB91` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x33979FFdC1B60cF727A90c043f1EC5CB15f6BB91) |
-| **`RelationEngine`** *(Mathematical Classifier)* | `0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49) |
-| **`CausoraRegistry`** *(Evidence & Whitelist)* | `0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF) |
+| **`CausoraVault`** *(Real CC3 Collateral Vault)* | `0x196a78ef8e039bD7E03C8d38694A0e5fB4EeBE92` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x196a78ef8e039bD7E03C8d38694A0e5fB4EeBE92) |
+| **`MockERC20 (ctUSD)`** *(Test Collateral Asset)* | `0xC9F496A95f2Ab073976579CdeED113Bd1Ee71C11` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xC9F496A95f2Ab073976579CdeED113Bd1Ee71C11) |
+| **`CausoraGuard`** *(Financial Policy Firewall)* | `0x4CABa84eF2D49dCFfDD5456AADEA5A42eB4a4699` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x4CABa84eF2D49dCFfDD5456AADEA5A42eB4a4699) |
+| **`LendingPositionManager`** *(Protocol Manager)* | `0x94B336Cdb7aDacffE270a8f1B607499Be3656518` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x94B336Cdb7aDacffE270a8f1B607499Be3656518) |
+| **`RelationEngine`** *(Mathematical Classifier)* | `0x59a9771e60ED99cBC583fe4C3fd9e83e94AF606d` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x59a9771e60ED99cBC583fe4C3fd9e83e94AF606d) |
+| **`CausoraRegistry`** *(Evidence & Whitelist)* | `0x87F61f848EdD7C3e0752Ded3bf9C303E7c74BD81` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x87F61f848EdD7C3e0752Ded3bf9C303E7c74BD81) |
 | **`BlockProver (0xFD2)`** *(Native Precompile)* | `0x0000000000000000000000000000000000000FD2` | Creditcoin CC3 (Core) | Precompile Interface |
 | **`ChainInfo (0xFD3)`** *(Native Precompile)* | `0x0000000000000000000000000000000000000FD3` | Creditcoin CC3 (Core) | Precompile Interface |
 | **`CollateralSource`** *(Controlled Source)* | `0x4b70c8885b54e4e3a16a99e57a779c64005bfc98` | Ethereum Sepolia (`11155111`) | [View on Sepolia Explorer](https://sepolia.etherscan.io/address/0x4b70c8885b54e4e3a16a99e57a779c64005bfc98) |

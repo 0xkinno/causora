@@ -31,7 +31,8 @@ test.describe('CAUSORA E2E Suite', () => {
     await page.goto('/app');
     await expect(page.locator('h1')).toContainText('Causora Protocol Console');
 
-    // Check Guarded Positions Tab
+    // Toggle Local Lab mode to verify test fixtures
+    await page.click('button:has-text("Local Lab")');
     await expect(page.getByText('POS-001-ETH-SEP')).toBeVisible();
     await expect(page.getByText('POS-002-CROSS-BTC')).toBeVisible();
 
@@ -82,8 +83,8 @@ test.describe('CAUSORA E2E Suite', () => {
 
     // Load Sepolia Deposit preset
     await page.click('button:has-text("Sepolia Deposit (Tx 42)")');
-    await page.click('button:has-text("Verify Merkle & Continuity Proof")');
-    await expect(page.getByText('Proof Inclusion Verified')).toBeVisible({ timeout: 5000 });
+    await page.click('button:has-text("Verify on Creditcoin CC3")');
+    await expect(page.getByText('READY FOR ADMISSION')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Canonical 72-Byte Packed Query ID:')).toBeVisible();
   });
 

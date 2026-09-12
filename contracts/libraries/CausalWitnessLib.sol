@@ -27,7 +27,8 @@ library CausalWitnessLib {
         if (
             witness.capabilityHash == bytes32(0) ||
             witness.parentDigest == bytes32(0) ||
-            witness.stateCommitment == bytes32(0)
+            witness.stateCommitment == bytes32(0) ||
+            witness.sequenceNumber == 0
         ) {
             return (false, "Incomplete or missing causal witness");
         }

@@ -79,8 +79,8 @@ export default function AppConsolePage() {
         const count = Number(countBN);
 
         if (count === 0) {
-          // No positions created on this deployment yet, display reference fixtures
-          setPositions(MOCK_POSITIONS);
+          // Zero mock positions in LIVE mode
+          setPositions([]);
         } else {
           const loaded: LendingPosition[] = [];
           for (let i = 0; i < Math.min(count, 10); i++) {
@@ -97,14 +97,15 @@ export default function AppConsolePage() {
               status: stateNames[raw.state] as any,
               lastDepositQueryId: raw.lastEvidenceDigest,
               lastLiquidationQueryId: ethers.ZeroHash,
+              lastUpdatedAt: Number(raw.lastUpdatedAt),
               history: [],
             });
           }
           setPositions(loaded);
         }
       } catch (err) {
-        console.warn('Could not load live CC3 positions, falling back to LOCAL LAB display:', err);
-        setPositions(MOCK_POSITIONS);
+        console.warn('Could not load live CC3 positions:', err);
+        setPositions([]);
       } finally {
         setLoadingPositions(false);
       }
@@ -379,9 +380,51 @@ export default function AppConsolePage() {
               <span>Querying Creditcoin CC3 Testnet contract state...</span>
             </div>
           ) : positions.length === 0 ? (
-            <div className="p-8 rounded-xl bg-surface border border-surface-border text-center space-y-2 text-xs font-mono text-slate-400">
-              <p>No active positions found on the deployed CC3 contract yet.</p>
-              <p className="text-slate-500">You can create a new position via the contract or toggle &quot;Local Lab&quot; above to inspect sample fixtures.</p>
+            <div className="p-10 rounded-xl bg-surface border border-surface-border text-center space-y-4 text-xs font-mono">
+              <div className="w-12 h-12 mx-auto rounded-full bg-surface-subtle border border-surface-border flex items-center justify-center text-slate-400">
+                <Layers className="w-6 h-6 text-slate-500" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-white text-sm font-bold font-display">No live positions found on Creditcoin CC3.</h3>
+                <p className="text-slate-500 max-w-md mx-auto text-[11px]">
+                  {isLiveMode
+                    ? "The LendingPositionManager contract on CC3 currently has 0 registered positions. Seed a fresh test position to view live on-chain collateral and debt state."
+                    : "No simulated positions are loaded in the current lab instance."}
+                </p>
+              </div>
+              {isLiveMode && (
+                <button
+                  onClick={async () => {
+                    try {
+                      if (typeof window !== 'undefined' && (window as any).ethereum) {
+                        const browserProvider = new ethers.BrowserProvider((window as any).ethereum);
+                        const signer = await browserProvider.getSigner();
+                        const lendingWithSigner = new ethers.Contract(
+                          CONTRACT_ADDRESSES.lendingPositionManager,
+                          LENDING_POSITION_MANAGER_ABI,
+                          signer
+                        );
+                        const tx = await lendingWithSigner.createPosition(
+                          1001n,
+                          signer.address,
+                          ethers.parseEther("10"),
+                          ethers.parseEther("5000")
+                        );
+                        await tx.wait(1);
+                        window.location.reload();
+                      } else {
+                        alert("Please connect an EVM browser wallet (e.g. MetaMask) to Creditcoin CC3 Testnet (ChainId 102031) to seed a position.");
+                      }
+                    } catch (e: any) {
+                      alert("Error seeding position: " + (e.message || String(e)));
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all shadow-md"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Seed Test Position on CC3</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -425,7 +468,7 @@ export default function AppConsolePage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-surface-subtle border border-surface-border text-xs font-mono">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 rounded-lg bg-surface-subtle border border-surface-border text-xs font-mono">
                       <div>
                         <span className="text-[10px] text-slate-500 block">Collateral (ctUSD)</span>
                         <span className="text-white font-bold">{pos.collateralAmount}</span>
@@ -446,6 +489,14 @@ export default function AppConsolePage() {
                           }
                         >
                           {pos.healthFactor.toFixed(2)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block">Last Updated</span>
+                        <span className="text-slate-300 text-[11px]">
+                          {pos.lastUpdatedAt && pos.lastUpdatedAt > 0
+                            ? new Date(pos.lastUpdatedAt * 1000).toLocaleTimeString()
+                            : "Genesis"}
                         </span>
                       </div>
                       <div>

@@ -26,3 +26,12 @@
 | **16. Malformed Causal Witness** | Fabricating unlinked witness parent digest | `CausalWitnessLib` strictly verifies hash chain commitment | **Enforces `INDETERMINATE`** |
 | **17. Capability Reuse** | Replaying single-use witness capabilities | Sequence number and commitment validation prevent double-spending | **Enforces `INDETERMINATE`** |
 | **18. Action on Indeterminate** | Forcing liquidation during `INDETERMINATE` | `CausoraGuard` enforces fail-closed `HOLD`, freezing liquidation | **Capital Protected** |
+| **19. Forged Causal Witness** | Injecting random pseudo-capability bytes | Cryptographic commitment check against parent digest fails | **Enforces `INDETERMINATE`** |
+| **20. Witness Parent Digest Mismatch** | Supplying valid capability bound to wrong parent event | `CausalWitnessLib` validates parent hash commitment | **Enforces `INDETERMINATE`** |
+| **21. Zero / Invalid Sequence Number** | Witness supplied with zero sequence number | Sequence monotonic check requires non-zero monotonic progression | **Enforces `INDETERMINATE`** |
+| **22. State Commitment Tampering** | Mutating post-state hash in causal witness | Exact state commitment hash verification fails | **Enforces `INDETERMINATE`** |
+| **23. Cross-Position Witness Replay** | Reusing valid witness across different positions | LendingPositionManager enforces `evidenceBoundPosition` single-position binding | **Reverts (`PositionBoundToDifferentEvidence`)** |
+| **24. Missing Witness in Event B** | Witness constructed off-chain without Event B committing to it | RelationEngine enforces that Event B payload strictly contains witness capability | **Enforces `INDETERMINATE`** |
+| **25. Unregistered Emitter Admission** | Attempting admission from un-whitelisted foreign address | `CausoraRegistry` checks source whitelist before admission | **Reverts (`SourceNotRegistered`)** |
+| **26. Guard Direct Bypass Attack** | Calling `evaluateGuard` directly with fabricated relation | `evaluateGuard` is internal; public entrypoint is `evaluateGuardFromEvidence` | **Inaccessible / Compile Rejection** |
+| **27. Vault Owner Bypass Attack** | Contract owner attempting direct withdrawal from `CausoraVault` | `onlyPositionManager` strictly requires `msg.sender == positionManager` | **Reverts (`UnauthorizedCaller`)** |

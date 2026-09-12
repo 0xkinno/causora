@@ -1,5 +1,5 @@
 // AUTO-GENERATED FROM HARDHAT ARTIFACTS — DO NOT EDIT MANUALLY
-// Generated at: 2026-09-12T19:22:58.389Z
+// Generated at: 2026-09-12T21:17:38.077Z
 
 export const CAUSORA_REGISTRY_ABI = [
   {
@@ -1115,6 +1115,17 @@ export const CAUSORA_GUARD_ABI = [
     "type": "constructor"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "queryId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "EvidenceNotFound",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "ZeroAddress",
     "type": "error"
@@ -1157,79 +1168,59 @@ export const CAUSORA_GUARD_ABI = [
     "type": "event"
   },
   {
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
         "internalType": "uint256",
         "name": "positionId",
         "type": "uint256"
       },
       {
-        "components": [
-          {
-            "internalType": "enum IRelationEngine.RelationClass",
-            "name": "classification",
-            "type": "uint8"
-          },
-          {
-            "internalType": "enum IRelationEngine.RelativeOrder",
-            "name": "order",
-            "type": "uint8"
-          },
-          {
-            "internalType": "uint64",
-            "name": "heightA",
-            "type": "uint64"
-          },
-          {
-            "internalType": "uint64",
-            "name": "indexA",
-            "type": "uint64"
-          },
-          {
-            "internalType": "uint64",
-            "name": "heightB",
-            "type": "uint64"
-          },
-          {
-            "internalType": "uint64",
-            "name": "indexB",
-            "type": "uint64"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "evidenceDigestA",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "evidenceDigestB",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "string",
-            "name": "reason",
-            "type": "string"
-          }
-        ],
-        "internalType": "struct IRelationEngine.RelationResult",
-        "name": "relation",
-        "type": "tuple"
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "nonce",
+        "type": "uint256"
       },
       {
-        "internalType": "enum ICausoraGuard.ActionPolicy",
-        "name": "policy",
-        "type": "uint8"
-      }
-    ],
-    "name": "evaluateGuard",
-    "outputs": [
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "evidenceA",
+        "type": "bytes32"
+      },
       {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "evidenceB",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
         "internalType": "enum ICausoraGuard.GuardDecision",
         "name": "decision",
         "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
       }
     ],
-    "stateMutability": "nonpayable",
+    "name": "PolicyEvaluatedWithNonce",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_EVIDENCE_AGE",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1351,6 +1342,25 @@ export const CAUSORA_GUARD_ABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "positionDecisionNonces",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "registry",
     "outputs": [
@@ -1425,6 +1435,33 @@ export const LENDING_POSITION_MANAGER_ABI = [
       }
     ],
     "name": "BusinessActionAlreadyConsumed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "queryId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "boundPositionId",
+        "type": "uint256"
+      }
+    ],
+    "name": "EvidenceBoundToOtherPosition",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "pairKey",
+        "type": "bytes32"
+      }
+    ],
+    "name": "EvidencePairAlreadyConsumed",
     "type": "error"
   },
   {
@@ -1677,6 +1714,25 @@ export const LENDING_POSITION_MANAGER_ABI = [
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "consumedEvidencePairs",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "positionId",
         "type": "uint256"
@@ -1700,6 +1756,25 @@ export const LENDING_POSITION_MANAGER_ABI = [
     "name": "createPosition",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "evidenceBoundPosition",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -2134,6 +2209,11 @@ export const CAUSORA_VAULT_ABI = [
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "PositionManagerAlreadySet",
+    "type": "error"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -2147,6 +2227,11 @@ export const CAUSORA_VAULT_ABI = [
   {
     "inputs": [],
     "name": "UnauthorizedCaller",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroAddress",
     "type": "error"
   },
   {

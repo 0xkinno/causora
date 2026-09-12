@@ -119,9 +119,19 @@ describe("Orderability Invariants Suite", function () {
     expect(await vault.isHeld(posId)).to.equal(true);
     expect(await vault.lockedCollateral(posId)).to.equal(initialCollateral);
 
-    // Later liquidation must revert
+    // Later liquidation directly from caller must revert with UnauthorizedCaller
     await expect(
       vault.executeProtectedTransition(posId, 2, liquidator.address, borrower.address, initialCollateral)
+    ).to.be.revertedWithCustomError(vault, "UnauthorizedCaller");
+
+    // Later liquidation even from authorized positionManager MUST revert with PositionIsHeld
+    const lendingSigner = await ethers.getImpersonatedSigner(await lending.getAddress());
+    await ethers.provider.send("hardhat_setBalance", [
+      await lending.getAddress(),
+      "0x1000000000000000000",
+    ]);
+    await expect(
+      vault.connect(lendingSigner).executeProtectedTransition(posId, 2, liquidator.address, borrower.address, initialCollateral)
     ).to.be.revertedWithCustomError(vault, "PositionIsHeld");
   });
 

@@ -1,0 +1,86 @@
+{
+  "timestamp": "2026-09-12T22:08:33.005Z",
+  "network": "Creditcoin CC3 Testnet",
+  "chainId": 102031,
+  "operator": "0xe4B713e3cF2E550147f9cc09d751f276E7B9A64e",
+  "contracts": {
+    "CausoraRegistry": {
+      "address": "0x87F61f848EdD7C3e0752Ded3bf9C303E7c74BD81",
+      "bytecodeVerified": true,
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x87F61f848EdD7C3e0752Ded3bf9C303E7c74BD81"
+    },
+    "RelationEngine": {
+      "address": "0x59a9771e60ED99cBC583fe4C3fd9e83e94AF606d",
+      "bytecodeVerified": true,
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x59a9771e60ED99cBC583fe4C3fd9e83e94AF606d"
+    },
+    "CausoraGuard": {
+      "address": "0x4CABa84eF2D49dCFfDD5456AADEA5A42eB4a4699",
+      "bytecodeVerified": true,
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x4CABa84eF2D49dCFfDD5456AADEA5A42eB4a4699"
+    },
+    "MockERC20_ctUSD": {
+      "address": "0xC9F496A95f2Ab073976579CdeED113Bd1Ee71C11",
+      "bytecodeVerified": true,
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0xC9F496A95f2Ab073976579CdeED113Bd1Ee71C11"
+    },
+    "CausoraVault": {
+      "address": "0x196a78ef8e039bD7E03C8d38694A0e5fB4EeBE92",
+      "bytecodeVerified": true,
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x196a78ef8e039bD7E03C8d38694A0e5fB4EeBE92"
+    },
+    "LendingPositionManager": {
+      "address": "0x94B336Cdb7aDacffE270a8f1B607499Be3656518",
+      "bytecodeVerified": true,
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x94B336Cdb7aDacffE270a8f1B607499Be3656518"
+    }
+  },
+  "precompiles": {
+    "blockProver": "0x0000000000000000000000000000000000000FD2",
+    "chainInfo": "0x0000000000000000000000000000000000000FD3",
+    "nativeVerificationEnforced": true
+  },
+  "seededPosition": {
+    "id": 1001,
+    "state": 2,
+    "borrower": "0xe4B713e3cF2E550147f9cc09d751f276E7B9A64e",
+    "collateralAmount": "10.0",
+    "debtAmount": "5000.0",
+    "txHash": "0x46fecf8260f94c1071042302e7031a974e22c206d718dcab52d9d126c466435e",
+    "blockNumber": 5477110
+  },
+  "admittedProofs": [
+    {
+      "status": "ENFORCED_BY_PRECOMPILE",
+      "queryId": "0xb054d6177daebc803073d2d404e2ca9b67a1c39806e766f8a0ea461340e29971",
+      "chainKey": 1,
+      "precompile": "0x0000000000000000000000000000000000000FD2 (BlockProver)",
+      "revertReason": "Merkle proof validation failed",
+      "message": "CC3 native BlockProver strictly rejects unverified synthetic Merkle roots.",
+      "invariantPreserved": true
+    },
+    {
+      "status": "ENFORCED_BY_PRECOMPILE",
+      "queryId": "0x4af0f28c5a85081af9487f91aad1b68318e3f62bfb629f795d6c9b5eaea9c3c2",
+      "chainKey": 3,
+      "precompile": "0x0000000000000000000000000000000000000FD2 (BlockProver)",
+      "revertReason": "Merkle proof validation failed",
+      "message": "CC3 native BlockProver strictly rejects unverified synthetic Merkle roots.",
+      "invariantPreserved": true
+    }
+  ],
+  "resolution": {
+    "status": "FAIL_CLOSED_PROTECTED",
+    "reason": "EvidenceDoesNotExist",
+    "message": "LendingPositionManager strictly requires cryptographically admitted evidence before allowing any position state transition.",
+    "invariantPreserved": true
+  },
+  "vaultInvariants": {
+    "positionManagerLocked": true,
+    "directCallRevertsUnauthorized": true,
+    "activePositionManager": "0x94B336Cdb7aDacffE270a8f1B607499Be3656518"
+  },
+  "replayPrevented": true,
+  "allChecksPassed": true,
+  "status": "CC3_E2E_VERIFIED"
+}

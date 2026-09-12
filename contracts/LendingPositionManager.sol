@@ -22,6 +22,12 @@ contract LendingPositionManager is ILendingPositionManager, Ownable {
     /// @notice Business-level semantic replay guard: actionKey => consumed
     mapping(bytes32 => bool) public consumedActionKeys;
 
+    /// @notice Evidence binding: queryId => bound positionId
+    mapping(bytes32 => uint256) public evidenceBoundPosition;
+
+    /// @notice Consumed evidence pairs: pairKey => consumed
+    mapping(bytes32 => bool) public consumedEvidencePairs;
+
     /// @notice Authorized risk evaluators
     mapping(address => bool) public riskEvaluators;
 
@@ -30,6 +36,8 @@ contract LendingPositionManager is ILendingPositionManager, Ownable {
     error PositionNotAtRisk(uint256 positionId, PositionState currentState);
     error ActionRejected(string reason);
     error BusinessActionAlreadyConsumed(bytes32 actionKey);
+    error EvidenceBoundToOtherPosition(bytes32 queryId, uint256 boundPositionId);
+    error EvidencePairAlreadyConsumed(bytes32 pairKey);
     error UnauthorizedCaller();
     error ZeroAddress();
 
@@ -126,11 +134,26 @@ contract LendingPositionManager is ILendingPositionManager, Ownable {
         }
 
         // Semantic business-level replay protection
+        ICausoraGuard.ActionPolicy policy = ICausoraGuard.ActionPolicy.FailClosedHold;
         bytes32 actionKey = keccak256(
-            abi.encode(positionId, "COLLATERAL_RACE", queryIdRescue, queryIdLiquidation)
+            abi.encode(positionId, "COLLATERAL_RACE", queryIdRescue, queryIdLiquidation, uint8(policy))
         );
         if (consumedActionKeys[actionKey]) {
             revert BusinessActionAlreadyConsumed(actionKey);
+        }
+
+        // Evidence-to-position binding protection
+        if (evidenceBoundPosition[queryIdRescue] != 0 && evidenceBoundPosition[queryIdRescue] != positionId) {
+            revert EvidenceBoundToOtherPosition(queryIdRescue, evidenceBoundPosition[queryIdRescue]);
+        }
+        if (evidenceBoundPosition[queryIdLiquidation] != 0 && evidenceBoundPosition[queryIdLiquidation] != positionId) {
+            revert EvidenceBoundToOtherPosition(queryIdLiquidation, evidenceBoundPosition[queryIdLiquidation]);
+        }
+
+        // Consumed evidence pair protection
+        bytes32 pairKey = keccak256(abi.encode(queryIdRescue, queryIdLiquidation));
+        if (consumedEvidencePairs[pairKey]) {
+            revert EvidencePairAlreadyConsumed(pairKey);
         }
 
         // 1. Authoritatively evaluate through CausoraGuard reading directly from registry
@@ -140,7 +163,7 @@ contract LendingPositionManager is ILendingPositionManager, Ownable {
             queryIdRescue,
             queryIdLiquidation,
             witness,
-            ICausoraGuard.ActionPolicy.FailClosedHold
+            policy
         );
 
         // 2. If decision is REJECT, fail-closed immediately without state or vault mutation
@@ -148,8 +171,11 @@ contract LendingPositionManager is ILendingPositionManager, Ownable {
             revert ActionRejected(relation.reason);
         }
 
-        // 3. Mark business action consumed permanently
+        // 3. Mark business action, evidence pair, and evidence-position binding consumed permanently
         consumedActionKeys[actionKey] = true;
+        consumedEvidencePairs[pairKey] = true;
+        evidenceBoundPosition[queryIdRescue] = positionId;
+        evidenceBoundPosition[queryIdLiquidation] = positionId;
         emit BusinessActionConsumed(actionKey, positionId);
 
         // 4. Mutate vault state & transfer collateral strictly according to decision

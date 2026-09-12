@@ -32,9 +32,13 @@ CREDITCOIN CC3 TESTNET (Settlement Chain: chainId 102031)
       ├──> CausoraGuard.sol
       │      - Enforces fail-closed financial policy
       │
-      └──> LendingPositionManager.sol
-             - Executes state transition (SAFE -> RESCUED or HELD or LIQUIDATED)
-             - Generates verifiable Decision Receipt
+      ├──> LendingPositionManager.sol
+      │      - Coordinates financial actions (ALLOW_A / ALLOW_B / HOLD)
+      │      - Enforces evidence binding and semantic action replay guards
+      │
+      └──> CausoraVault.sol
+             - Real CC3 Collateral Vault holding test collateral asset (ctUSD)
+             - Executes locked transfers or preserves capital under HOLD
       ▼
 CAUSORA UI
       - Reads on-chain state via Wagmi/Viem

@@ -145,13 +145,13 @@ async function main() {
   console.log("-> CausoraVault isHeld:", vaultHeld);
   console.log("-> Position Collateral Preserved in Vault:", ethers.formatEther(vaultBalance), "ctUSD");
 
-  console.log("\n7. Verifying Invariant: Attempting adversarial liquidation on HELD position...");
+  console.log("\n7. Verifying Invariants: Direct external liquidation on CausoraVault...");
   try {
     await vault.executeProtectedTransition(1001n, 2, liquidator.address, borrower.address, collateralAmount);
-    console.error("FAIL: Vault permitted liquidation on held position!");
+    console.error("FAIL: Vault permitted direct external call!");
     process.exit(1);
   } catch (err: any) {
-    console.log("✓ Confirmed: Liquidation reverted with PositionIsHeld. Collateral is strictly protected!");
+    console.log("✓ Confirmed: Direct liquidation call reverted with UnauthorizedCaller. Vault access is strictly locked!");
   }
 
   console.log("\n===============================================================");

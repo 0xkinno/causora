@@ -22,19 +22,25 @@ contract CausoraVault is ICausoraVault, Ownable {
     error InsufficientVaultCollateral(uint256 positionId, uint256 available, uint256 required);
     error InvalidGuardDecision();
     error PositionIsHeld(uint256 positionId);
+    error PositionManagerAlreadySet();
+    error ZeroAddress();
 
     modifier onlyPositionManager() {
-        if (msg.sender != positionManager && msg.sender != owner()) {
+        if (msg.sender != positionManager) {
             revert UnauthorizedCaller();
         }
         _;
     }
 
     constructor(address _collateralToken) Ownable(msg.sender) {
+        if (_collateralToken == address(0)) revert ZeroAddress();
         collateralToken = IERC20(_collateralToken);
     }
 
+    /// @notice Sets the authoritative LendingPositionManager — single-assignment immutable deployment pattern
     function setPositionManager(address _positionManager) external onlyOwner {
+        if (positionManager != address(0)) revert PositionManagerAlreadySet();
+        if (_positionManager == address(0)) revert ZeroAddress();
         positionManager = _positionManager;
         emit PositionManagerUpdated(_positionManager);
     }

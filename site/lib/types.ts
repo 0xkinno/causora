@@ -57,6 +57,7 @@ export interface LendingPosition {
   lastDepositTimestamp?: number;
   lastLiquidationQueryId?: string;
   status: 'ACTIVE' | 'HELD_PENDING_ORDER' | 'LIQUIDATED' | 'HEALTHY' | 'SAFE' | 'AT_RISK' | 'RESCUED';
+  lastUpdatedAt?: number;
   history: DecisionRecord[];
 }
 
