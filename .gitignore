@@ -21,3 +21,7 @@ site/dist/
 *.zip
 causora_wired/
 .vercel/
+video/
+*.mp4
+*.wav
+*.mp3
