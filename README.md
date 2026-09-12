@@ -253,6 +253,23 @@ flowchart TD
 
 ---
 
+## Contract Addresses & Deployed System (Creditcoin CC3 Testnet)
+
+| Contract | Address | Network | Explorer / Verification Link |
+|---|---|---|---|
+| **`CausoraVault`** *(Real CC3 Collateral Vault)* | `0x5FC8d32690cc91D4c39d9d3abcBD16989F875707` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x5FC8d32690cc91D4c39d9d3abcBD16989F875707) |
+| **`MockERC20 (ctUSD)`** *(Test Collateral Asset)* | `0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9) |
+| **`CausoraGuard`** *(Financial Policy Firewall)* | `0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0) |
+| **`LendingPositionManager`** *(Protocol Manager)* | `0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9) |
+| **`RelationEngine`** *(Mathematical Classifier)* | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512) |
+| **`CausoraRegistry`** *(Evidence & Whitelist)* | `0x5FbDB2315678afecb367f032d93F642f64180aa3` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x5FbDB2315678afecb367f032d93F642f64180aa3) |
+| **`BlockProver (0xFD2)`** *(Native Precompile)* | `0x0000000000000000000000000000000000000FD2` | Creditcoin CC3 (Core) | Precompile Interface |
+| **`ChainInfo (0xFD3)`** *(Native Precompile)* | `0x0000000000000000000000000000000000000FD3` | Creditcoin CC3 (Core) | Precompile Interface |
+| **`CollateralSource`** *(Controlled Source)* | `0x4b70c8885b54e4e3a16a99e57a779c64005bfc98` | Ethereum Sepolia (`11155111`) | [View on Sepolia Explorer](https://sepolia.etherscan.io/address/0x4b70c8885b54e4e3a16a99e57a779c64005bfc98) |
+| **`Aave V3 Pool`** *(Liquidation Source)* | `0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2` | Ethereum Mainnet (`1`) | [View on Etherscan](https://etherscan.io/address/0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2) |
+
+---
+
 ## Product Flow
 
 ```mermaid
