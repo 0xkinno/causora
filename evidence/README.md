@@ -12,7 +12,7 @@ This directory contains empirical benchmark data, cryptographic verification tra
 | **Proof Latency & Pipeline Metrics** | [`benchmarks/latency.json`](./benchmarks/latency.json) | Measured latency across proof verification stages |
 | **Gas Efficiency Across Operations** | [`benchmarks/gas.json`](./benchmarks/gas.json) | Real transaction gas consumed on Creditcoin CC3 EVM |
 | **Empirical Relation Classifications** | [`relation-cases.jsonl`](./relation-cases.jsonl) | Live decision matrix recordings |
-| **Adversarial Fail-Closed Evidence** | [`attacks/`](./attacks/) | 18 attack vectors and mitigation proofs |
+| **Adversarial Fail-Closed Evidence** | [`attacks/`](./attacks/) | 27 attack vectors and mitigation proofs |
 | **Live CC3 On-Chain Judging Verification** | [`judging/cc3-testnet-judge.json`](./judging/cc3-testnet-judge.json) | `CC3_TESTNET_VERIFIED` bytecode & precompiles proof |
 
 ## Deterministic Verification Gates
@@ -20,7 +20,7 @@ This directory contains empirical benchmark data, cryptographic verification tra
 To reproduce and verify all evidence claims locally or on Creditcoin CC3 testnet:
 
 ```bash
-npm test            # Runs 33 unit, attack, and invariant tests (100% passing)
+npm test            # Runs 44 unit, attack, and invariant tests (100% passing)
 npm run judge:local # Executes local judging verification gate (LOCAL_VERIFIED)
 npm run judge:cc3   # Executes live Creditcoin CC3 testnet verification gate (CC3_TESTNET_VERIFIED)
 npm run build:ui    # Validates production Next.js compilation

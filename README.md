@@ -11,6 +11,12 @@
 
 ---
 
+<div align="center">
+  <img src="docs/screenshots/banner.png" alt="Causora Protocol Banner" width="100%"/>
+</div>
+
+---
+
 ## Brief Description
 
 Two honest blockchains can both produce valid cryptographic proofs and still disagree about "what happened first."
@@ -26,6 +32,7 @@ Using Creditcoin's native Attestcoin precompiles, Causora verifies foreign facts
 
 | Resource | Target | Description |
 |---|---|---|
+| **Production Web App** | [**`causora.vercel.app`**](https://causora.vercel.app) | Official production deployment on Vercel |
 | **Live Web Console** | [`/app`](https://causora.vercel.app/app) | Real-time Causora orderability firewall and position explorer |
 | **Attack Simulator** | [`/break-it`](https://causora.vercel.app/break-it) | Interactive 4-gate adversarial test harness |
 | **Proof Verifier** | [`/verify`](https://causora.vercel.app/verify) | Independent cryptographic proof inspector |
@@ -34,7 +41,7 @@ Using Creditcoin's native Attestcoin precompiles, Causora verifies foreign facts
 | **Blockscout Explorer** | `https://creditcoin-testnet.blockscout.com` | Creditcoin CC3 official block explorer |
 | **ProofBuilder API** | `https://prover.cc3-testnet.creditcoin.network` | Official Attestcoin Merkle & continuity proof generator |
 
-> **Local Development URL**: When running locally via `npm run dev`, access the console at `http://localhost:3000`.
+> **Live Production Deployment**: Access the live protocol console at [**https://causora.vercel.app**](https://causora.vercel.app).
 
 ---
 
@@ -197,7 +204,7 @@ function evaluateGuardFromEvidence(
 
 ## Break It Yourself
  
-Visit [`/break-it`](https://causora.vercel.app/break-it) (or `http://localhost:3000/break-it` in local development) in the web application to test four interactive judging gates:
+Visit [`/break-it`](https://causora.vercel.app/break-it) in the web application to test four interactive judging gates:
 1. **Gate 1: VALID ORDER** $\rightarrow$ Verifies same-chain order and executes action.
 2. **Gate 2: INVALID PROOF** $\rightarrow$ Reverts on tampered Merkle root or failed receipt.
 3. **Gate 3: UNPROVABLE ORDER** $\rightarrow$ Demonstrates deterministic transition to `HOLD`.
@@ -375,6 +382,28 @@ cd site
 npm install
 npm run dev
 ```
+
+---
+
+## Documentation
+
+Comprehensive specifications, cryptographic proofs, security models, and empirical verification artifacts are detailed in the following supporting documents:
+
+| Document | Category | Description |
+|---|---|---|
+| [`CLAIMS.md`](./CLAIMS.md) | Verification | Protocol claims inventory, capability classification standard (`LIVE`, `LOCAL`, `OFFCHAIN`), and proof matrix |
+| [`DEPLOYMENT.md`](./DEPLOYMENT.md) | Operations | Official Creditcoin CC3 Testnet contract registry, deployment receipts, block numbers, and explorer links |
+| [`E2E_PROOF.md`](./E2E_PROOF.md) | Architecture | End-to-end cryptographic proof verification pipeline from source chain to `CausoraVault` execution |
+| [`AUDIT.md`](./AUDIT.md) | Security | Comprehensive protocol security audit, threat vectors reviewed, and vulnerability remediation history |
+| [`docs/ATTESTCOIN.md`](./docs/ATTESTCOIN.md) | Precompiles | Deep-dive specification on native Creditcoin precompiles (`BlockProver 0xFD2` & `ChainInfo 0xFD3`) |
+| [`docs/ORDERABILITY.md`](./docs/ORDERABILITY.md) | Mathematics | Formal orderability theory: same-chain DAGs, causal witnesses, and indeterminate boundaries |
+| [`docs/THREAT_MODEL.md`](./docs/THREAT_MODEL.md) | Security | Formal 27-vector adversarial threat matrix, attack scenarios, and deterministic on-chain defenses |
+| [`docs/QUERY_ID.md`](./docs/QUERY_ID.md) | Cryptography | Specification of canonical 72-byte packed Query ID and cryptographic replay prevention architecture |
+| [`docs/PROOF.md`](./docs/PROOF.md) | Proofs | Technical reference for Attestcoin Merkle transaction trees, continuity proofs, and evidence decoding |
+| [`docs/MEASUREMENT.md`](./docs/MEASUREMENT.md) | Performance | Empirical gas consumption benchmarks on CC3 and cross-chain pipeline latency profiling |
+| [`docs/INTEGRATING.md`](./docs/INTEGRATING.md) | Integration | Developer integration guide for lending protocols, liquidators, and vaults adopting `CausoraGuard` |
+| [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md) | Protocol Scope | Operational boundaries, network assumptions, and fail-closed safety constraints |
+| [`evidence/README.md`](./evidence/README.md) | Empirical Evidence | Index of all empirical benchmarks, attack receipts, and live CC3 judging telemetry artifacts |
 
 ---
 

@@ -23,7 +23,7 @@ npm run judge
 
 ## 3. Running the Adversarial Attack Suite
 
-Verify all 18 adversarial attack vectors revert or fail closed:
+Verify all 27 adversarial attack vectors revert or fail closed:
 ```bash
 npm run test:attacks
 ```

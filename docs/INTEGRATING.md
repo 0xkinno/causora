@@ -17,21 +17,17 @@ function executeProtectedDeFiAction(
     bytes32 queryIdActionB,
     IRelationEngine.CausalWitness calldata witness
 ) external {
-    // 1. Fetch proven evidence
-    ICausoraRegistry.EventEvidence memory evA = registry.getEvidence(queryIdActionA);
-    ICausoraRegistry.EventEvidence memory evB = registry.getEvidence(queryIdActionB);
-
-    // 2. Classify orderability relation
-    IRelationEngine.RelationResult memory relation = relationEngine.classifyRelation(evA, evB, witness);
-
-    // 3. Evaluate guard policy
-    ICausoraGuard.GuardDecision decision = guard.evaluateGuard(
+    // 1. Evaluate guard policy directly against admitted registry evidence
+    // This authenticates evidence internally and prevents caller calldata forgery
+    (ICausoraGuard.GuardDecision decision, IRelationEngine.RelationResult memory relation) = guard.evaluateGuardFromEvidence(
         positionId,
-        relation,
+        queryIdActionA,
+        queryIdActionB,
+        witness,
         ICausoraGuard.ActionPolicy.FailClosedHold
     );
 
-    // 4. Act according to deterministic authorization
+    // 2. Act according to deterministic authorization
     if (decision == ICausoraGuard.GuardDecision.ALLOW_A) {
         _applyActionA(positionId);
     } else if (decision == ICausoraGuard.GuardDecision.ALLOW_B) {

@@ -20,3 +20,4 @@ site/.next/
 site/dist/
 *.zip
 causora_wired/
+.vercel/
