@@ -26,12 +26,15 @@ Using Creditcoin's native Attestcoin precompiles, Causora verifies foreign facts
 
 | Resource | Target | Description |
 |---|---|---|
-| **Live Web Console** | [`/app`](http://localhost:3000/app) | Real-time Causora orderability firewall and position explorer |
-| **Attack Simulator** | [`/break-it`](http://localhost:3000/break-it) | Interactive 4-gate adversarial test harness |
-| **Proof Verifier** | [`/verify`](http://localhost:3000/verify) | Independent cryptographic proof inspector |
-| **Interactive Docs** | [`/docs`](http://localhost:3000/docs) | Full technical specification & integration guide |
+| **Live Web Console** | [`/app`](https://causora.vercel.app/app) | Real-time Causora orderability firewall and position explorer |
+| **Attack Simulator** | [`/break-it`](https://causora.vercel.app/break-it) | Interactive 4-gate adversarial test harness |
+| **Proof Verifier** | [`/verify`](https://causora.vercel.app/verify) | Independent cryptographic proof inspector |
+| **Interactive Docs** | [`/docs`](https://causora.vercel.app/docs) | Full technical specification & integration guide |
 | **Creditcoin CC3 RPC** | `https://rpc.cc3-testnet.creditcoin.network` | Destination decision & settlement chain (Chain ID: `102031`) |
+| **Blockscout Explorer** | `https://creditcoin-testnet.blockscout.com` | Creditcoin CC3 official block explorer |
 | **ProofBuilder API** | `https://prover.cc3-testnet.creditcoin.network` | Official Attestcoin Merkle & continuity proof generator |
+
+> **Local Development URL**: When running locally via `npm run dev`, access the console at `http://localhost:3000`.
 
 ---
 
@@ -191,8 +194,8 @@ function evaluateGuard(
 ---
 
 ## Break It Yourself
-
-Visit [`/break-it`](http://localhost:3000/break-it) in the live web application to test four interactive judging gates:
+ 
+Visit [`/break-it`](https://causora.vercel.app/break-it) (or `http://localhost:3000/break-it` in local development) in the web application to test four interactive judging gates:
 1. **Gate 1: VALID ORDER** $\rightarrow$ Verifies same-chain order and executes action.
 2. **Gate 2: INVALID PROOF** $\rightarrow$ Reverts on tampered Merkle root or failed receipt.
 3. **Gate 3: UNPROVABLE ORDER** $\rightarrow$ Demonstrates deterministic transition to `HOLD`.
@@ -253,16 +256,31 @@ flowchart TD
 
 ---
 
+## Truth & Scope
+
+To ensure complete clarity and auditability, the operational boundaries of the Causora protocol are strictly categorized:
+
+| Layer | Environment | Operational Scope & Guarantees |
+|---|---|---|
+| **LIVE PROTOCOL** | **Creditcoin CC3 Testnet (`102031`)** | Core protocol logic executes on-chain on Creditcoin CC3. This includes synchronous verification via native precompiles (`0xFD2` BlockProver, `0xFD3` ChainInfo), on-chain evidence admission with replay protection (`CausoraRegistry.sol`), formal orderability classification (`RelationEngine.sol`), policy evaluation (`CausoraGuard.sol`), and vault state transitions & locking (`LendingPositionManager.sol`, `CausoraVault.sol`). |
+| **LOCAL LAB & ADVERSARIAL TESTBED** | **Deterministic Fixtures / Simulation** | Controlled scenario generators used in `/break-it` and the automated test suites. This includes synthetic edge cases, simulated reorgs, forged Merkle roots, and mutated signatures to verify all 18 attack vectors and state invariants. |
+| **ADVISORY AI LAYER** | **Gemini / MCP Interface** | Strictly explanatory and secondary. Generates human-readable breakdowns of verified receipts and proof structures. The AI layer has **zero authority** over smart contract execution or financial authorizations; all transitions depend strictly on raw cryptographic proofs. |
+
+> [!NOTE]
+> **Collateral Asset Terminology**: The token **`ctUSD`** is a dedicated **Creditcoin CC3 testnet collateral asset token** (`MockERC20.sol`) deployed strictly for demonstration and testing purposes. It has no fiat peg and carries no monetary value.
+
+---
+
 ## Contract Addresses & Deployed System (Creditcoin CC3 Testnet)
 
 | Contract | Address | Network | Explorer / Verification Link |
 |---|---|---|---|
-| **`CausoraVault`** *(Real CC3 Collateral Vault)* | `0x5FC8d32690cc91D4c39d9d3abcBD16989F875707` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x5FC8d32690cc91D4c39d9d3abcBD16989F875707) |
-| **`MockERC20 (ctUSD)`** *(Test Collateral Asset)* | `0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9) |
-| **`CausoraGuard`** *(Financial Policy Firewall)* | `0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0) |
-| **`LendingPositionManager`** *(Protocol Manager)* | `0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9) |
-| **`RelationEngine`** *(Mathematical Classifier)* | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512) |
-| **`CausoraRegistry`** *(Evidence & Whitelist)* | `0x5FbDB2315678afecb367f032d93F642f64180aa3` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x5FbDB2315678afecb367f032d93F642f64180aa3) |
+| **`CausoraVault`** *(Real CC3 Collateral Vault)* | `0x7047D67Ef69F40F9340Fd97EDF79276458238cfe` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x7047D67Ef69F40F9340Fd97EDF79276458238cfe) |
+| **`MockERC20 (ctUSD)`** *(Test Collateral Asset)* | `0x43410D288dFA265A560eb7DfFCa2991fA687d78d` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x43410D288dFA265A560eb7DfFCa2991fA687d78d) |
+| **`CausoraGuard`** *(Financial Policy Firewall)* | `0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5) |
+| **`LendingPositionManager`** *(Protocol Manager)* | `0x33979FFdC1B60cF727A90c043f1EC5CB15f6BB91` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x33979FFdC1B60cF727A90c043f1EC5CB15f6BB91) |
+| **`RelationEngine`** *(Mathematical Classifier)* | `0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49) |
+| **`CausoraRegistry`** *(Evidence & Whitelist)* | `0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF` | Creditcoin CC3 (`102031`) | [View on Explorer](https://creditcoin-testnet.blockscout.com/address/0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF) |
 | **`BlockProver (0xFD2)`** *(Native Precompile)* | `0x0000000000000000000000000000000000000FD2` | Creditcoin CC3 (Core) | Precompile Interface |
 | **`ChainInfo (0xFD3)`** *(Native Precompile)* | `0x0000000000000000000000000000000000000FD3` | Creditcoin CC3 (Core) | Precompile Interface |
 | **`CollateralSource`** *(Controlled Source)* | `0x4b70c8885b54e4e3a16a99e57a779c64005bfc98` | Ethereum Sepolia (`11155111`) | [View on Sepolia Explorer](https://sepolia.etherscan.io/address/0x4b70c8885b54e4e3a16a99e57a779c64005bfc98) |

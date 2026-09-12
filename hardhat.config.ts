@@ -5,9 +5,15 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY && process.env.PRIVATE_KEY.length === 66 
-  ? [process.env.PRIVATE_KEY] 
-  : [];
+function getAccounts(): string[] {
+  const pk = process.env.PRIVATE_KEY;
+  if (!pk) return [];
+  const normalized = pk.startsWith("0x") ? pk : `0x${pk}`;
+  if (normalized.length === 66) return [normalized];
+  return [];
+}
+
+const accounts = getAccounts();
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -28,12 +34,12 @@ const config: HardhatUserConfig = {
     creditcoin_testnet: {
       url: process.env.CREDITCOIN_RPC_URL || 'https://rpc.cc3-testnet.creditcoin.network',
       chainId: 102031,
-      accounts: PRIVATE_KEY,
+      accounts: accounts,
     },
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
       chainId: 11155111,
-      accounts: PRIVATE_KEY,
+      accounts: accounts,
     },
   },
   paths: {

@@ -48,13 +48,15 @@ export interface DecisionRecord {
 export interface LendingPosition {
   id: string;
   borrower: string;
+  collateralAsset?: string;
   collateralAmount: string; // e.g. "50.0 ETH"
   debtAmount: string;       // e.g. "120,000 CTC"
   healthFactor: number;     // e.g. 1.42
   lastDepositQueryId: string;
-  lastDepositTxHash: string;
-  lastDepositTimestamp: number;
-  status: 'ACTIVE' | 'HELD_PENDING_ORDER' | 'LIQUIDATED' | 'HEALTHY';
+  lastDepositTxHash?: string;
+  lastDepositTimestamp?: number;
+  lastLiquidationQueryId?: string;
+  status: 'ACTIVE' | 'HELD_PENDING_ORDER' | 'LIQUIDATED' | 'HEALTHY' | 'SAFE' | 'AT_RISK' | 'RESCUED';
   history: DecisionRecord[];
 }
 

@@ -1,32 +1,115 @@
 {
   "network": "Creditcoin CC3 Testnet",
   "chainId": 102031,
-  "deployedAt": "2026-09-12T17:01:48.319Z",
-  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "commitSha": "a9f3b18c",
-  "explorerUrl": "https://creditcoin-testnet.blockscout.com",
+  "deployedAt": "2026-09-12T19:22:31.349Z",
+  "deployer": "0xe4B713e3cF2E550147f9cc09d751f276E7B9A64e",
+  "explorerBaseUrl": "https://creditcoin-testnet.blockscout.com",
+  "precompiles": {
+    "BlockProver": "0x0000000000000000000000000000000000000FD2",
+    "ChainInfo": "0x0000000000000000000000000000000000000FD3"
+  },
   "contracts": {
-    "CausoraRegistry": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-    "RelationEngine": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-    "CausoraGuard": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-    "LendingPositionManager": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-    "CausoraVault": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-    "MockERC20_ctUSD": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-    "BlockProverPrecompile": "0x0000000000000000000000000000000000000FD2",
-    "ChainInfoPrecompile": "0x0000000000000000000000000000000000000FD3"
+    "CausoraRegistry": {
+      "contractName": "CausoraRegistry",
+      "address": "0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF",
+      "deploymentTxHash": "0x605b30f2ce4cf918f9ca550b59d6fc1271a504d696e1e82c15c5e7e98cf2bf99",
+      "blockNumber": 5476646,
+      "gasUsed": "1932249",
+      "bytecodePresent": true,
+      "owner": "0xe4B713e3cF2E550147f9cc09d751f276E7B9A64e",
+      "constructorArguments": [],
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF"
+    },
+    "RelationEngine": {
+      "contractName": "RelationEngine",
+      "address": "0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49",
+      "deploymentTxHash": "0xdd7e18b077a06f39ea48d49ffbf6bc5f8203ccfc7300e41d94c063e79fb62abd",
+      "blockNumber": 5476647,
+      "gasUsed": "778978",
+      "bytecodePresent": true,
+      "owner": "N/A",
+      "constructorArguments": [],
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49"
+    },
+    "CausoraGuard": {
+      "contractName": "CausoraGuard",
+      "address": "0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5",
+      "deploymentTxHash": "0x1acfbafdba975931a620a4fe75c1dc5c9e9ab55b038fed742df32bc15f101c3e",
+      "blockNumber": 5476648,
+      "gasUsed": "762823",
+      "bytecodePresent": true,
+      "owner": "N/A",
+      "constructorArguments": [
+        "0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF",
+        "0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49"
+      ],
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5"
+    },
+    "MockERC20_ctUSD": {
+      "contractName": "MockERC20_ctUSD",
+      "address": "0x43410D288dFA265A560eb7DfFCa2991fA687d78d",
+      "deploymentTxHash": "0x502830e2fe51d85c90188aec3bb306c4650d0b2fb7646e79f236dc3404be6cd9",
+      "blockNumber": 5476649,
+      "gasUsed": "568306",
+      "bytecodePresent": true,
+      "owner": "N/A",
+      "constructorArguments": [
+        "Creditcoin Test USD",
+        "ctUSD"
+      ],
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x43410D288dFA265A560eb7DfFCa2991fA687d78d"
+    },
+    "CausoraVault": {
+      "contractName": "CausoraVault",
+      "address": "0x7047D67Ef69F40F9340Fd97EDF79276458238cfe",
+      "deploymentTxHash": "0xec98fcee530a3547afd3b3951b116d838440d798d25da3b48009720686a12927",
+      "blockNumber": 5476650,
+      "gasUsed": "484721",
+      "bytecodePresent": true,
+      "owner": "0xe4B713e3cF2E550147f9cc09d751f276E7B9A64e",
+      "constructorArguments": [
+        "0x43410D288dFA265A560eb7DfFCa2991fA687d78d"
+      ],
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x7047D67Ef69F40F9340Fd97EDF79276458238cfe"
+    },
+    "LendingPositionManager": {
+      "contractName": "LendingPositionManager",
+      "address": "0x33979FFdC1B60cF727A90c043f1EC5CB15f6BB91",
+      "deploymentTxHash": "0xb8fa4340b89616d70ad17402f3f2e62f65e07cf1fc072370ca88a8cf9093992f",
+      "blockNumber": 5476651,
+      "gasUsed": "1077494",
+      "bytecodePresent": true,
+      "owner": "0xe4B713e3cF2E550147f9cc09d751f276E7B9A64e",
+      "constructorArguments": [
+        "0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF",
+        "0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49",
+        "0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5",
+        "0x7047D67Ef69F40F9340Fd97EDF79276458238cfe"
+      ],
+      "blockscoutUrl": "https://creditcoin-testnet.blockscout.com/address/0x33979FFdC1B60cF727A90c043f1EC5CB15f6BB91"
+    }
   },
   "whitelistedSources": [
     {
       "chainKey": 1,
       "emitter": "0x4B70c8885B54e4e3A16a99E57A779c64005BFc98",
       "kind": "CollateralVault",
-      "chainName": "Ethereum Sepolia"
+      "expectedEventSignature": "0x7d392fa0008462da419170a953745938c5cb4499a97e736e61f4c7f3d841f900",
+      "description": "Sepolia Collateral Source"
     },
     {
       "chainKey": 3,
       "emitter": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
       "kind": "LiquidationEngine",
-      "chainName": "Ethereum Mainnet"
+      "expectedEventSignature": "0x26f8822fbae3c35d6aad5712773b1bc143f3f60896892873ad22b75a55adf113",
+      "description": "Mainnet Liquidation Source"
+    },
+    {
+      "chainKey": 1,
+      "emitter": "0x3333333333333333333333333333333333333333",
+      "kind": "CausalWitnessHub",
+      "expectedEventSignature": "0x1bbecdb5a23f0c569a7dec84e2e3e20727fe1f633c96ef3ccfec73230a2b2300",
+      "description": "Cross-Chain Causal Witness Source"
     }
   ]
 }

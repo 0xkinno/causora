@@ -1,5 +1,5 @@
 import { createConfig, http } from 'wagmi';
-import { injected } from '@wagmi/core';
+import { injected, walletConnect, coinbaseWallet } from '@wagmi/connectors';
 import { defineChain } from 'viem';
 
 export const creditcoinTestnet = defineChain({
@@ -52,9 +52,16 @@ export const sepolia = defineChain({
   testnet: true,
 });
 
+const walletConnectProjectId =
+  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '3a8170812b534d0ff9d794f19a901d64';
+
 export const config = createConfig({
   chains: [creditcoinTestnet, sepolia],
-  connectors: [injected()],
+  connectors: [
+    injected(),
+    coinbaseWallet({ appName: 'Causora Protocol' }),
+    walletConnect({ projectId: walletConnectProjectId, showQrModal: true }),
+  ],
   transports: {
     [creditcoinTestnet.id]: http('https://rpc.cc3-testnet.creditcoin.network'),
     [sepolia.id]: http('https://rpc.sepolia.org'),

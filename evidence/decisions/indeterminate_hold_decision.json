@@ -1,23 +1,18 @@
 {
-  "crossChainIndeterminate": {
-    "decisionId": "0xdec9483759283746152435465748392019283746",
-    "positionId": 1001,
-    "generatedAt": "2026-09-12T17:01:00Z",
-    "commitSha": "a9f3b18c",
-    "chainId": 102031,
-    "queryIdA": "0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00",
-    "queryIdB": "0xa5e7653ca91e46598ffabba1fce0354dba893f676a2e2f7f29c4fa343bf35a71",
-    "relationClass": "CROSS_CHAIN_INDETERMINATE",
-    "relativeOrder": "UNPROVABLE",
-    "action": "HOLD",
-    "reasonCode": "CROSS_CHAIN_ORDER_UNPROVABLE",
-    "reasonDescription": "Cross-chain events on independent chains lack cryptographic causal witness. Order is unprovable.",
-    "evidenceDigests": {
-      "evidenceA": "0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00",
-      "evidenceB": "0xa5e7653ca91e46598ffabba1fce0354dba893f676a2e2f7f29c4fa343bf35a71"
-    },
-    "creditcoinVerificationTx": "0x789abc1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-    "finalPositionState": "HELD",
-    "capitalPreserved": "10.0 ETH (100% safeguarded)"
-  }
+  "generator": "scripts/generate-evidence.ts",
+  "generatedAt": "2026-09-12T18:38:38.930Z",
+  "positionId": 1001,
+  "queryIdA": "0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00",
+  "queryIdB": "0xa5e7653ca91e46598ffabba1fce0354dba893f676a2e2f7f29c4fa343bf35a71",
+  "relationClass": "CROSS_CHAIN_INDETERMINATE",
+  "relativeOrder": "UNPROVABLE",
+  "guardAction": "HOLD",
+  "reason": "Cross-chain events on independent chains lack cryptographic causal witness. Order is unprovable.",
+  "vaultState": {
+    "isHeld": true,
+    "lockedCollateralWei": "10000000000000000000",
+    "lockedCollateralFormatted": "10.0 ctUSD"
+  },
+  "resolutionTxHash": "0x9d0cead8b9de6f2b867dd78715c80499d86789cb2c606b7b91291a68afdbf94c",
+  "finalPositionState": "3"
 }

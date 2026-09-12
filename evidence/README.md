@@ -6,18 +6,24 @@ This directory contains empirical benchmark data, cryptographic verification tra
 
 | Claim | Verified Artifact | Description |
 |---|---|---|
-| **Creditcoin CC3 Chain ID is 102031** | [`network.json`](./network.json) | RPC and precompile address verification |
+| **Creditcoin CC3 Deployment** | [`deployment/cc3-testnet.json`](./deployment/cc3-testnet.json) | Live deployment tx hashes, blocks, and Blockscout explorer links |
+| **Creditcoin CC3 Chain ID is 102031** | [`network.json`](./network.json) | RPC, chainId, and precompile address verification |
 | **Attested Source Chains** | [`supported-chains.json`](./supported-chains.json) | Sepolia (chainKey 1) and Mainnet (chainKey 3) mapping |
-| **Proof Latency & Pipeline Metrics** | [`proof-latency.json`](./proof-latency.json) | ProofBuilder and BlockProver execution latency |
-| **Gas Efficiency Across Operations** | [`gas-results.json`](./gas-results.json) | Full execution profiling under 75,000,000 gas cap |
+| **Proof Latency & Pipeline Metrics** | [`benchmarks/latency.json`](./benchmarks/latency.json) | Measured latency across proof verification stages |
+| **Gas Efficiency Across Operations** | [`benchmarks/gas.json`](./benchmarks/gas.json) | Real transaction gas consumed on Creditcoin CC3 EVM |
 | **Empirical Relation Classifications** | [`relation-cases.jsonl`](./relation-cases.jsonl) | Live decision matrix recordings |
 | **Adversarial Fail-Closed Evidence** | [`attacks/`](./attacks/) | 18 attack vectors and mitigation proofs |
+| **Live CC3 On-Chain Judging Verification** | [`judging/cc3-testnet-judge.json`](./judging/cc3-testnet-judge.json) | `CC3_TESTNET_VERIFIED` bytecode & precompiles proof |
 
-## Deterministic Verification Gate
+## Deterministic Verification Gates
 
-To reproduce and verify all evidence claims locally or on testnet:
+To reproduce and verify all evidence claims locally or on Creditcoin CC3 testnet:
 
 ```bash
-npm test          # Runs 29 unit, attack, and invariant tests
-npm run judge     # Executes the end-to-end judging verification gate
+npm test            # Runs 33 unit, attack, and invariant tests (100% passing)
+npm run judge:local # Executes local judging verification gate (LOCAL_VERIFIED)
+npm run judge:cc3   # Executes live Creditcoin CC3 testnet verification gate (CC3_TESTNET_VERIFIED)
+npm run build:ui    # Validates production Next.js compilation
+npm run test:e2e    # Runs Playwright E2E suite across 8 device viewports (56/56 passing)
 ```
+

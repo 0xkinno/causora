@@ -5,10 +5,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ICausoraGuard} from "./interfaces/ICausoraGuard.sol";
+import {ICausoraVault} from "./interfaces/ICausoraVault.sol";
 
 /// @title CausoraVault
 /// @notice Real CC3 Collateral Vault enforcing financial state transitions governed by CausoraGuard
-contract CausoraVault is Ownable {
+contract CausoraVault is ICausoraVault, Ownable {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable collateralToken;
@@ -16,11 +17,6 @@ contract CausoraVault is Ownable {
 
     mapping(uint256 => uint256) public lockedCollateral;
     mapping(uint256 => bool) public isHeld;
-
-    event CollateralDeposited(uint256 indexed positionId, address indexed depositor, uint256 amount);
-    event VaultCollateralReleased(uint256 indexed positionId, address indexed recipient, uint256 amount);
-    event VaultCollateralHeld(uint256 indexed positionId, uint256 lockedAmount, string reason);
-    event PositionManagerUpdated(address indexed positionManager);
 
     error UnauthorizedCaller();
     error InsufficientVaultCollateral(uint256 positionId, uint256 available, uint256 required);

@@ -1,5 +1,5 @@
 // AUTO-GENERATED FROM HARDHAT ARTIFACTS — DO NOT EDIT MANUALLY
-// Generated at: 2026-09-12T17:01:59.881Z
+// Generated at: 2026-09-12T19:22:58.389Z
 
 export const CAUSORA_REGISTRY_ABI = [
   {
@@ -8,8 +8,35 @@ export const CAUSORA_REGISTRY_ABI = [
     "type": "constructor"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "chainKey",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint256",
+        "name": "matchCount",
+        "type": "uint256"
+      }
+    ],
+    "name": "AmbiguousEventLogs",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "BlockProverPrecompileError",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "chainKey",
+        "type": "uint64"
+      }
+    ],
+    "name": "ExpectedEventNotFound",
     "type": "error"
   },
   {
@@ -85,17 +112,6 @@ export const CAUSORA_REGISTRY_ABI = [
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "emitter",
-        "type": "address"
-      }
-    ],
-    "name": "UnregisteredEmitterLog",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "uint8",
         "name": "txType",
         "type": "uint8"
@@ -107,6 +123,11 @@ export const CAUSORA_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "ZeroAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroEventSignature",
     "type": "error"
   },
   {
@@ -204,6 +225,12 @@ export const CAUSORA_REGISTRY_ABI = [
         "internalType": "enum ICausoraRegistry.SourceKind",
         "name": "kind",
         "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "expectedEventSignature",
+        "type": "bytes32"
       },
       {
         "indexed": false,
@@ -600,6 +627,40 @@ export const CAUSORA_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "uint64",
+        "name": "chainKey",
+        "type": "uint64"
+      },
+      {
+        "internalType": "address",
+        "name": "emitter",
+        "type": "address"
+      }
+    ],
+    "name": "getSourceRegistration",
+    "outputs": [
+      {
+        "internalType": "enum ICausoraRegistry.SourceKind",
+        "name": "kind",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "expectedEventSignature",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "description",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "queryId",
         "type": "bytes32"
@@ -695,6 +756,11 @@ export const CAUSORA_REGISTRY_ABI = [
         "type": "uint8"
       },
       {
+        "internalType": "bytes32",
+        "name": "expectedEventSignature",
+        "type": "bytes32"
+      },
+      {
         "internalType": "string",
         "name": "description",
         "type": "string"
@@ -743,12 +809,27 @@ export const CAUSORA_REGISTRY_ABI = [
         "type": "address"
       }
     ],
-    "name": "sourceContracts",
+    "name": "sourceRegistrations",
     "outputs": [
       {
         "internalType": "enum ICausoraRegistry.SourceKind",
-        "name": "",
+        "name": "kind",
         "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "expectedEventSignature",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "description",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "exists",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -1314,6 +1395,11 @@ export const LENDING_POSITION_MANAGER_ABI = [
         "internalType": "address",
         "name": "_guard",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_vault",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -1328,6 +1414,17 @@ export const LENDING_POSITION_MANAGER_ABI = [
       }
     ],
     "name": "ActionRejected",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "actionKey",
+        "type": "bytes32"
+      }
+    ],
+    "name": "BusinessActionAlreadyConsumed",
     "type": "error"
   },
   {
@@ -1392,8 +1489,32 @@ export const LENDING_POSITION_MANAGER_ABI = [
   },
   {
     "inputs": [],
+    "name": "UnauthorizedCaller",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ZeroAddress",
     "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "actionKey",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "positionId",
+        "type": "uint256"
+      }
+    ],
+    "name": "BusinessActionConsumed",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -1514,6 +1635,44 @@ export const LENDING_POSITION_MANAGER_ABI = [
     ],
     "name": "PositionRescued",
     "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "evaluator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "approved",
+        "type": "bool"
+      }
+    ],
+    "name": "RiskEvaluatorUpdated",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "consumedActionKeys",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [
@@ -1842,12 +2001,770 @@ export const LENDING_POSITION_MANAGER_ABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "riskEvaluators",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "evaluator",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "approved",
+        "type": "bool"
+      }
+    ],
+    "name": "setRiskEvaluator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "newOwner",
         "type": "address"
       }
     ],
     "name": "transferOwnership",
     "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "vault",
+    "outputs": [
+      {
+        "internalType": "contract ICausoraVault",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
+
+export const CAUSORA_VAULT_ABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_collateralToken",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "positionId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "available",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "required",
+        "type": "uint256"
+      }
+    ],
+    "name": "InsufficientVaultCollateral",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidGuardDecision",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "positionId",
+        "type": "uint256"
+      }
+    ],
+    "name": "PositionIsHeld",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "SafeERC20FailedOperation",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UnauthorizedCaller",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "positionId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "depositor",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "CollateralDeposited",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "positionManager",
+        "type": "address"
+      }
+    ],
+    "name": "PositionManagerUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "positionId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lockedAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "VaultCollateralHeld",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "positionId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "VaultCollateralReleased",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "collateralToken",
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "positionId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "depositCollateral",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "positionId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum ICausoraGuard.GuardDecision",
+        "name": "decision",
+        "type": "uint8"
+      },
+      {
+        "internalType": "address",
+        "name": "liquidator",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "executeProtectedTransition",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "success",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "isHeld",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "lockedCollateral",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "positionManager",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_positionManager",
+        "type": "address"
+      }
+    ],
+    "name": "setPositionManager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+] as const;
+
+export const MOCK_ERC20_ABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "symbol",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "spender",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "allowance",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "needed",
+        "type": "uint256"
+      }
+    ],
+    "name": "ERC20InsufficientAllowance",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "balance",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "needed",
+        "type": "uint256"
+      }
+    ],
+    "name": "ERC20InsufficientBalance",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "approver",
+        "type": "address"
+      }
+    ],
+    "name": "ERC20InvalidApprover",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
+      }
+    ],
+    "name": "ERC20InvalidReceiver",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "ERC20InvalidSender",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "spender",
+        "type": "address"
+      }
+    ],
+    "name": "ERC20InvalidSpender",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "spender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "Approval",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "Transfer",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "spender",
+        "type": "address"
+      }
+    ],
+    "name": "allowance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "spender",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "approve",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "balanceOf",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "decimals",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "mint",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "name",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "transfer",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferFrom",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "function"
   }
@@ -2576,8 +3493,10 @@ export const CHAIN_INFO_ABI = [
 export const CONTRACT_ADDRESSES = {
   blockProver: '0x0000000000000000000000000000000000000FD2',
   chainInfo: '0x0000000000000000000000000000000000000fD3',
-  causoraRegistry: (process.env.NEXT_PUBLIC_CAUSORA_REGISTRY_ADDRESS || '0x9487c672C15F3354C11bce5539555cb523f0fe78') as `0x${string}`,
-  relationEngine: (process.env.NEXT_PUBLIC_RELATION_ENGINE_ADDRESS || '0x68f700445d3F7d0c3fe7E7d39B2A8A962F7f1a3A') as `0x${string}`,
-  causoraGuard: (process.env.NEXT_PUBLIC_CAUSORA_GUARD_ADDRESS || '0x3841D3B17f2A3F7499645832a24553258c73d9e2') as `0x${string}`,
-  lendingPositionManager: (process.env.NEXT_PUBLIC_LENDING_POSITION_MANAGER_ADDRESS || '0xD47aBC43194B4D864fa9c669146200EbD99026Ac') as `0x${string}`,
+  causoraRegistry: (process.env.NEXT_PUBLIC_CAUSORA_REGISTRY_ADDRESS || '0x9D0ED40615845ee6134F475AcCF35e0412CA1EdF') as `0x${string}`,
+  relationEngine: (process.env.NEXT_PUBLIC_RELATION_ENGINE_ADDRESS || '0xFa34633c12e5A93166FAA0E54A3D50Fd62Ae8D49') as `0x${string}`,
+  causoraGuard: (process.env.NEXT_PUBLIC_CAUSORA_GUARD_ADDRESS || '0x029192f49d95eD5B147cE7E6Fc18d01BDfb513c5') as `0x${string}`,
+  lendingPositionManager: (process.env.NEXT_PUBLIC_LENDING_MANAGER_ADDRESS || '0x33979FFdC1B60cF727A90c043f1EC5CB15f6BB91') as `0x${string}`,
+  causoraVault: (process.env.NEXT_PUBLIC_CAUSORA_VAULT_ADDRESS || '0x7047D67Ef69F40F9340Fd97EDF79276458238cfe') as `0x${string}`,
+  mockERC20: (process.env.NEXT_PUBLIC_MOCK_ERC20_ADDRESS || '0x43410D288dFA265A560eb7DfFCa2991fA687d78d') as `0x${string}`,
 } as const;

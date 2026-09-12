@@ -6,6 +6,8 @@ import {
   RelationEngine,
   CausoraGuard,
   LendingPositionManager,
+  CausoraVault,
+  MockERC20,
   MockBlockProver
 } from "../../typechain-types";
 import { CausalWitnessBuilder } from "../../src/witness/causal-witness";
@@ -16,6 +18,8 @@ describe("Adversarial Attack Suite (18 Vectors)", function () {
   let registry: CausoraRegistry;
   let relationEngine: RelationEngine;
   let guard: CausoraGuard;
+  let vault: CausoraVault;
+  let ctUSD: MockERC20;
   let lending: LendingPositionManager;
   let owner: any;
   let attacker: any;
@@ -23,6 +27,7 @@ describe("Adversarial Attack Suite (18 Vectors)", function () {
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
   const emitterSepolia = "0x1111111111111111111111111111111111111111";
   const emitterMainnet = "0x2222222222222222222222222222222222222222";
+  const defaultSig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
 
   beforeEach(async function () {
     await setupPrecompiles();
@@ -44,34 +49,44 @@ describe("Adversarial Attack Suite (18 Vectors)", function () {
     guard = await guardFactory.deploy(await registry.getAddress(), await relationEngine.getAddress());
     await guard.waitForDeployment();
 
+    const erc20Factory = await ethers.getContractFactory("MockERC20");
+    ctUSD = await erc20Factory.deploy("Creditcoin Test USD", "ctUSD");
+    await ctUSD.waitForDeployment();
+
+    const vaultFactory = await ethers.getContractFactory("CausoraVault");
+    vault = await vaultFactory.deploy(await ctUSD.getAddress());
+    await vault.waitForDeployment();
+
     const lendFactory = await ethers.getContractFactory("LendingPositionManager");
     lending = await lendFactory.deploy(
       await registry.getAddress(),
       await relationEngine.getAddress(),
-      await guard.getAddress()
+      await guard.getAddress(),
+      await vault.getAddress()
     );
     await lending.waitForDeployment();
 
-    // Register approved sources
-    await registry.registerSource(1n, emitterSepolia, 1, "Sepolia Collateral");
-    await registry.registerSource(3n, emitterMainnet, 2, "Mainnet Liquidation");
+    await vault.setPositionManager(await lending.getAddress());
+
+    // Register approved sources with authentic event signature
+    await registry.registerSource(1n, emitterSepolia, 1, defaultSig, "Sepolia Collateral");
+    await registry.registerSource(3n, emitterMainnet, 2, defaultSig, "Mainnet Liquidation");
   });
 
-  
-function toPlainEvidence(ev: any) {
-  return {
-    chainKey: ev.chainKey,
-    blockHeight: ev.blockHeight,
-    txIndex: ev.txIndex,
-    txHash: ev.txHash,
-    emitter: ev.emitter,
-    eventSig: ev.eventSig,
-    queryId: ev.queryId,
-    payloadHash: ev.payloadHash,
-    verifiedAt: ev.verifiedAt,
-    exists: ev.exists,
-  };
-}
+  function toPlainEvidence(ev: any) {
+    return {
+      chainKey: ev.chainKey,
+      blockHeight: ev.blockHeight,
+      txIndex: ev.txIndex,
+      txHash: ev.txHash,
+      emitter: ev.emitter,
+      eventSig: ev.eventSig,
+      queryId: ev.queryId,
+      payloadHash: ev.payloadHash,
+      verifiedAt: ev.verifiedAt,
+      exists: ev.exists,
+    };
+  }
 
   function makeEncodedTx(status: number, emitter: string, logSig: string, data: string = "0x") {
     const commonChunk = abiCoder.encode(
@@ -92,9 +107,8 @@ function toPlainEvidence(ev: any) {
 
   // Attack 1: Submission-Order Attack
   it("Attack 1: Submission order does NOT manipulate derived block/index order", async function () {
-    const sig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
-    const encEarly = makeEncodedTx(1, emitterSepolia, sig);
-    const encLate = makeEncodedTx(1, emitterSepolia, sig);
+    const encEarly = makeEncodedTx(1, emitterSepolia, defaultSig);
+    const encLate = makeEncodedTx(1, emitterSepolia, defaultSig);
 
     const proofEarly = { root: ethers.keccak256(ethers.toUtf8Bytes("root1")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s1")), isLeft: false }] };
     const proofLate = { root: ethers.keccak256(ethers.toUtf8Bytes("root2")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s2")), isLeft: true }] };
@@ -117,9 +131,8 @@ function toPlainEvidence(ev: any) {
 
   // Attack 2: Proof-sniping / Delayed Proof Attack
   it("Attack 2: Delayed proof cannot manufacture artificial precedence over provably earlier event", async function () {
-    const sig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
-    const enc1 = makeEncodedTx(1, emitterSepolia, sig);
-    const enc2 = makeEncodedTx(1, emitterSepolia, sig);
+    const enc1 = makeEncodedTx(1, emitterSepolia, defaultSig);
+    const enc2 = makeEncodedTx(1, emitterSepolia, defaultSig);
 
     const proof1 = { root: ethers.keccak256(ethers.toUtf8Bytes("root1")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s1")), isLeft: false }] };
     const proof2 = { root: ethers.keccak256(ethers.toUtf8Bytes("root2")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s2")), isLeft: false }] };
@@ -140,10 +153,7 @@ function toPlainEvidence(ev: any) {
 
   // Attack 3: Wrong-chain replay
   it("Attack 3: Wrong-chain replay is prevented by chainKey binding in queryId", async function () {
-    const sig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
-    const enc = makeEncodedTx(1, emitterSepolia, sig);
     const proof = { root: ethers.keccak256(ethers.toUtf8Bytes("root1")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s1")), isLeft: false }] };
-    const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
 
     const qSepolia = await registry.computeQueryId(1n, 100n, proof.root, proof.siblings);
     const qMainnet = await registry.computeQueryId(3n, 100n, proof.root, proof.siblings);
@@ -164,10 +174,21 @@ function toPlainEvidence(ev: any) {
     ).to.be.revertedWithCustomError(registry, "SourceNotRegistered");
   });
 
+  // Attack 4B (Priority 3 Hardening): Event signature mismatch on registered emitter
+  it("Attack 4B: Rejects mismatched event signature on whitelisted emitter", async function () {
+    const fakeSig = ethers.keccak256(ethers.toUtf8Bytes("UnregisteredLog()"));
+    const enc = makeEncodedTx(1, emitterSepolia, fakeSig);
+    const proof = { root: ethers.keccak256(ethers.toUtf8Bytes("rootSigMismatch")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s1")), isLeft: false }] };
+    const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
+
+    await expect(
+      registry.admitEvidence(1n, 100n, enc, proof, cont)
+    ).to.be.revertedWithCustomError(registry, "ExpectedEventNotFound");
+  });
+
   // Attack 5: Failed source transaction presented as successful
   it("Attack 5: Rejects reverted source transactions (receiptStatus == 0)", async function () {
-    const sig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
-    const encReverted = makeEncodedTx(0, emitterSepolia, sig); // receiptStatus = 0
+    const encReverted = makeEncodedTx(0, emitterSepolia, defaultSig); // receiptStatus = 0
     const proof = { root: ethers.keccak256(ethers.toUtf8Bytes("root1")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s1")), isLeft: false }] };
     const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
 
@@ -189,8 +210,7 @@ function toPlainEvidence(ev: any) {
 
   // Attack 7: Tampered Merkle proof
   it("Attack 7: Tampered Merkle proof root reverts in BlockProver", async function () {
-    const sig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
-    const enc = makeEncodedTx(1, emitterSepolia, sig);
+    const enc = makeEncodedTx(1, emitterSepolia, defaultSig);
     const badProof = { root: ethers.ZeroHash, siblings: [] }; // Empty root
     const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
 
@@ -203,8 +223,7 @@ function toPlainEvidence(ev: any) {
   it("Attack 8: BlockProver rejection on broken continuity", async function () {
     const verifierAtFd2 = await ethers.getContractAt("MockBlockProver", "0x0000000000000000000000000000000000000FD2");
     await verifierAtFd2.setShouldFail(true);
-    const sig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
-    const enc = makeEncodedTx(1, emitterSepolia, sig);
+    const enc = makeEncodedTx(1, emitterSepolia, defaultSig);
     const proof = { root: ethers.keccak256(ethers.toUtf8Bytes("root1")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s1")), isLeft: false }] };
     const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
 
@@ -216,8 +235,7 @@ function toPlainEvidence(ev: any) {
 
   // Attack 9 & 10: Stale/Expired/Duplicated proof reuse
   it("Attack 9 & 10: Prevents replaying an already admitted proof (Replay Guard)", async function () {
-    const sig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
-    const enc = makeEncodedTx(1, emitterSepolia, sig);
+    const enc = makeEncodedTx(1, emitterSepolia, defaultSig);
     const proof = { root: ethers.keccak256(ethers.toUtf8Bytes("root1")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("s1")), isLeft: false }] };
     const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
 
@@ -231,9 +249,8 @@ function toPlainEvidence(ev: any) {
 
   // Attack 11: Front-run / refutation manipulation
   it("Attack 11: Front-runner on independent chain cannot force precedence", async function () {
-    const sig = ethers.keccak256(ethers.toUtf8Bytes("TestEvent()"));
-    const encA = makeEncodedTx(1, emitterSepolia, sig);
-    const encB = makeEncodedTx(1, emitterMainnet, sig);
+    const encA = makeEncodedTx(1, emitterSepolia, defaultSig);
+    const encB = makeEncodedTx(1, emitterMainnet, defaultSig);
 
     const proofA = { root: ethers.keccak256(ethers.toUtf8Bytes("rootA")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("sA")), isLeft: false }] };
     const proofB = { root: ethers.keccak256(ethers.toUtf8Bytes("rootB")), siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("sB")), isLeft: false }] };
@@ -261,7 +278,7 @@ function toPlainEvidence(ev: any) {
       txIndex: 1n,
       txHash: ethers.keccak256(ethers.toUtf8Bytes("txA")),
       emitter: emitterSepolia,
-      eventSig: ethers.keccak256(ethers.toUtf8Bytes("Event()")),
+      eventSig: defaultSig,
       queryId: ethers.keccak256(ethers.toUtf8Bytes("q1")),
       payloadHash: ethers.keccak256(ethers.toUtf8Bytes("legitPayload")),
       verifiedAt: 100n,
@@ -283,7 +300,7 @@ function toPlainEvidence(ev: any) {
       txIndex: 0n,
       txHash: ethers.keccak256(ethers.toUtf8Bytes("txA")),
       emitter: emitterSepolia,
-      eventSig: ethers.keccak256(ethers.toUtf8Bytes("Event()")),
+      eventSig: defaultSig,
       queryId: ethers.keccak256(ethers.toUtf8Bytes("qA")),
       payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA")),
       verifiedAt: 100n,
@@ -303,7 +320,7 @@ function toPlainEvidence(ev: any) {
       txIndex: 0n,
       txHash: ethers.keccak256(ethers.toUtf8Bytes("txA")),
       emitter: emitterSepolia,
-      eventSig: ethers.keccak256(ethers.toUtf8Bytes("Event()")),
+      eventSig: defaultSig,
       queryId: ethers.keccak256(ethers.toUtf8Bytes("qA")),
       payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA")),
       verifiedAt: 100n,
@@ -323,7 +340,7 @@ function toPlainEvidence(ev: any) {
       txIndex: 0n,
       txHash: ethers.keccak256(ethers.toUtf8Bytes("txA")),
       emitter: emitterSepolia,
-      eventSig: ethers.keccak256(ethers.toUtf8Bytes("Event()")),
+      eventSig: defaultSig,
       queryId: ethers.keccak256(ethers.toUtf8Bytes("qA")),
       payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA")),
       verifiedAt: 100n,
@@ -343,26 +360,32 @@ function toPlainEvidence(ev: any) {
     expect(res.classification).to.equal(3); // CROSS_CHAIN_INDETERMINATE
   });
 
-  // Attack 17: Witness reuse
-  it("Attack 17: Witness state commitment requires matching sequence & payload", async function () {
+  // Attack 17: Witness without matching Event B payload
+  it("Attack 17: Witness requires Event B payload to cryptographically commit to consumption", async function () {
     const evA = {
       chainKey: 1n,
       blockHeight: 100n,
       txIndex: 0n,
       txHash: ethers.keccak256(ethers.toUtf8Bytes("txA")),
       emitter: emitterSepolia,
-      eventSig: ethers.keccak256(ethers.toUtf8Bytes("Event()")),
+      eventSig: defaultSig,
       queryId: ethers.keccak256(ethers.toUtf8Bytes("qA")),
       payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA")),
       verifiedAt: 100n,
       exists: true
     };
-    const evB = { ...evA, chainKey: 3n, blockHeight: 50n };
+    // Event B has uncommitted payload
+    const evB = {
+      ...evA,
+      chainKey: 3n,
+      blockHeight: 50n,
+      eventSig: ethers.keccak256(ethers.toUtf8Bytes("CausalityConsumed(bytes32,bytes32,uint64,bytes32)")),
+      payloadHash: ethers.keccak256(ethers.toUtf8Bytes("uncommittedPayload"))
+    };
 
     const validWitness = CausalWitnessBuilder.createWitness(1, 100, evA.queryId, evA.payloadHash, 1);
-    const reusedWitness = { ...validWitness, sequenceNumber: 2n }; // Mismatched sequence
 
-    const res = await relationEngine.classifyRelation(toPlainEvidence(evA), toPlainEvidence(evB), reusedWitness);
+    const res = await relationEngine.classifyRelation(toPlainEvidence(evA), toPlainEvidence(evB), validWitness);
     expect(res.classification).to.equal(3); // CROSS_CHAIN_INDETERMINATE
   });
 

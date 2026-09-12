@@ -11,11 +11,11 @@ contract CausalWitnessSource {
         bytes32 stateCommitment
     );
 
-    event CausalActionExecuted(
-        bytes32 indexed capabilityHash,
-        address indexed consumer,
+    event CausalityConsumed(
+        bytes32 parentDigest,
+        bytes32 capabilityHash,
         uint64 sequenceNumber,
-        bytes32 parentDigest
+        bytes32 stateCommitment
     );
 
     mapping(bytes32 => bool) public consumedCapabilities;
@@ -28,13 +28,15 @@ contract CausalWitnessSource {
         emit CausalCapabilityMinted(capabilityHash, msg.sender, sequenceNumber, stateCommitment);
     }
 
-    function executeWithCapability(
+    function consumeCausality(
+        bytes32 parentDigest,
         bytes32 capabilityHash,
         uint64 sequenceNumber,
-        bytes32 parentDigest
+        bytes32 stateCommitment
     ) external {
-        require(!consumedCapabilities[capabilityHash], "Capability already consumed");
-        consumedCapabilities[capabilityHash] = true;
-        emit CausalActionExecuted(capabilityHash, msg.sender, sequenceNumber, parentDigest);
+        bytes32 consumptionKey = keccak256(abi.encode(parentDigest, capabilityHash, sequenceNumber));
+        require(!consumedCapabilities[consumptionKey], "Capability already consumed");
+        consumedCapabilities[consumptionKey] = true;
+        emit CausalityConsumed(parentDigest, capabilityHash, sequenceNumber, stateCommitment);
     }
 }

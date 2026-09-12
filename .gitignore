@@ -10,6 +10,9 @@ research/
 .env
 .env.local
 .env.*.local
+site/.env.local
+site/.env.*.local
+site/test-results/
 *.log
 scratch/
 site/node_modules/

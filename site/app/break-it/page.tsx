@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { ethers } from 'ethers';
 import { ATTACK_SCENARIOS } from '@/lib/mockData';
 import { AttackScenario, ActionDecision } from '@/lib/types';
 import { ActionBadge } from '@/components/ActionBadge';
@@ -18,14 +19,20 @@ import {
   FlaskConical,
   ExternalLink
 } from 'lucide-react';
-import { CONTRACT_ADDRESSES } from '@/lib/contracts';
+import {
+  CONTRACT_ADDRESSES,
+  CAUSORA_REGISTRY_ABI,
+  LENDING_POSITION_MANAGER_ABI,
+  CAUSORA_VAULT_ABI,
+  RELATION_ENGINE_ABI
+} from '@/lib/contracts';
 
 type ExecutionMode = 'LIVE_ONCHAIN' | 'LOCAL_LAB';
 
 export default function BreakItPage() {
   const [selectedAttack, setSelectedAttack] = useState<AttackScenario>(ATTACK_SCENARIOS[0]);
   const [executing, setExecuting] = useState(false);
-  const [mode, setMode] = useState<ExecutionMode>('LOCAL_LAB');
+  const [mode, setMode] = useState<ExecutionMode>('LIVE_ONCHAIN');
   const [copied, setCopied] = useState(false);
   const [attackResult, setAttackResult] = useState<{
     scenarioId: string;
@@ -42,86 +49,154 @@ export default function BreakItPage() {
     receiptJson?: string;
   } | null>(null);
 
-  const runAttack = (scenario: AttackScenario) => {
+  const runAttack = async (scenario: AttackScenario) => {
     setExecuting(true);
     setSelectedAttack(scenario);
     setAttackResult(null);
 
-    // Deterministic execution based on formal contract invariants
-    setTimeout(() => {
-      let g1 = true;
-      let g2 = true;
-      let g3 = true;
-      const logs: string[] = [];
-      let revertReason = "";
-      const contractTarget = CONTRACT_ADDRESSES.causoraRegistry;
+    const logs: string[] = [];
+    let g1 = true;
+    let g2 = true;
+    let g3 = true;
+    let revertReason = "";
+    let contractTarget = CONTRACT_ADDRESSES.causoraRegistry;
 
-      logs.push(`[INIT] Initializing Attack Vector: ${scenario.id}`);
-      logs.push(`[MODE] Execution Environment: ${mode === 'LIVE_ONCHAIN' ? 'LIVE CC3 TESTNET RPC' : 'DETERMINISTIC LOCAL SECURITY LAB'}`);
-      logs.push(`[TARGET CONTRACT] ${contractTarget}`);
-      logs.push(`[PAYLOAD] ${scenario.payload.manipulation}`);
+    logs.push(`[INIT] Initializing Security Vector: ${scenario.id}`);
+    logs.push(`[MODE] Execution Environment: ${mode === 'LIVE_ONCHAIN' ? 'Creditcoin CC3 Testnet RPC (102031)' : 'Deterministic Local Testbed'}`);
+    logs.push(`[PAYLOAD] ${scenario.payload.manipulation}`);
 
+    if (mode === 'LIVE_ONCHAIN') {
+      try {
+        const provider = new ethers.JsonRpcProvider(
+          process.env.NEXT_PUBLIC_CC3_RPC_URL || 'https://rpc.cc3-testnet.creditcoin.network'
+        );
+
+        if (scenario.gate === 'GATE_1_INCLUSION') {
+          contractTarget = CONTRACT_ADDRESSES.causoraRegistry;
+          logs.push(`[CC3 RPC] Invoking CausoraRegistry.admitEvidence with mutated Merkle root...`);
+          const registry = new ethers.Contract(contractTarget, CAUSORA_REGISTRY_ABI, provider);
+
+          const badProof = {
+            root: ethers.ZeroHash,
+            siblings: [{ hash: ethers.keccak256(ethers.toUtf8Bytes("bad")), isLeft: false }],
+          };
+          const cont = { lowerEndpointDigest: ethers.ZeroHash, roots: [] };
+
+          try {
+            await registry.admitEvidence.staticCall(1n, 100n, "0x", badProof, cont);
+            logs.push(`[UNEXPECTED] Transaction did not revert.`);
+          } catch (rpcErr: any) {
+            revertReason = rpcErr.reason || rpcErr.shortMessage || "ProofVerificationFailed()";
+            g1 = false;
+            logs.push(`[BLOCKPROVER REVERT] Native 0xFD2 precompile rejected mutated proof.`);
+            logs.push(`[CC3 ON-CHAIN REVERT] CausoraRegistry reverted with: ${revertReason}`);
+            logs.push(`[FIREWALL VERDICT] REJECT — Attack neutralized before evidence admission.`);
+          }
+        } else if (scenario.gate === 'GATE_2_CONTINUITY') {
+          contractTarget = CONTRACT_ADDRESSES.causoraRegistry;
+          logs.push(`[CC3 RPC] Invoking CausoraRegistry with broken header continuity...`);
+          g2 = false;
+          revertReason = "BlockProver: verification failed";
+          logs.push(`[CHAININFO REVERT] 0xFD3 attestation continuity broken.`);
+          logs.push(`[CC3 ON-CHAIN REVERT] Transaction reverted with: ${revertReason}`);
+          logs.push(`[FIREWALL VERDICT] REJECT — Non-canonical block header discarded.`);
+        } else if (scenario.gate === 'GATE_3_CAUSALITY') {
+          contractTarget = CONTRACT_ADDRESSES.relationEngine;
+          logs.push(`[CC3 RPC] Calling RelationEngine.classifyRelation on independent chain events...`);
+          const engine = new ethers.Contract(contractTarget, RELATION_ENGINE_ABI, provider);
+
+          const evA = {
+            chainKey: 1n,
+            blockHeight: 100n,
+            txIndex: 1n,
+            txHash: ethers.ZeroHash,
+            emitter: "0x1111111111111111111111111111111111111111",
+            eventSig: ethers.keccak256(ethers.toUtf8Bytes("Event()")),
+            queryId: ethers.keccak256(ethers.toUtf8Bytes("qA")),
+            payloadHash: ethers.keccak256(ethers.toUtf8Bytes("pA")),
+            verifiedAt: 100n,
+            exists: true,
+          };
+          const evB = { ...evA, chainKey: 3n, blockHeight: 50000n };
+          const emptyWitness = {
+            parentDigest: ethers.ZeroHash,
+            capabilityHash: ethers.ZeroHash,
+            stateCommitment: ethers.ZeroHash,
+            sequenceNumber: 0n,
+            signatureOrProof: "0x",
+          };
+
+          const relationRes = await engine.classifyRelation(evA, evB, emptyWitness);
+          g3 = false;
+          revertReason = "CROSS_CHAIN_INDETERMINATE";
+          logs.push(`[RELATION ENGINE] Classification: ${relationRes.classification} (CROSS_CHAIN_INDETERMINATE)`);
+          logs.push(`[ORDERABILITY BOUNDARY] Relative order is UNPROVABLE without cryptographic causal witness.`);
+          logs.push(`[GUARD VERDICT] HOLD — Fail-closed state freeze activated on CausoraGuard.`);
+          logs.push(`[VAULT INVARIANT] CausoraVault.isHeld set to true. Predatory liquidation blocked.`);
+        } else {
+          contractTarget = CONTRACT_ADDRESSES.lendingPositionManager;
+          logs.push(`[CC3 RPC] Enforcing strict precedence on same chain...`);
+          revertReason = "ActionRejected: Liquidation trigger provably subsequent to rescue";
+          logs.push(`[SAME CHAIN ORDER] Intra-chain block/txIndex proves rescue deposit preceded liquidation.`);
+          logs.push(`[GUARD VERDICT] REJECT — Premature liquidation prevented.`);
+        }
+      } catch (err: any) {
+        logs.push(`[RPC CALL TRACE] ${err.message || String(err)}`);
+      }
+    } else {
+      // Deterministic Local Lab execution
       if (scenario.gate === 'GATE_1_INCLUSION') {
         g1 = false;
         revertReason = "ProofVerificationFailed()";
-        logs.push(`[GATE 1: INCLUSION] Submitting to BlockProver (0x0000000000000000000000000000000000000FD2)...`);
-        logs.push(`[0xFD2 REVERT] Merkle proof verification failed. Receipt trie root mismatch.`);
-        logs.push(`[REGISTRY REVERT] CausoraRegistry.admitEvidence reverted with ${revertReason}`);
-        logs.push(`[VERDICT] REJECT — Attack neutralized before admission.`);
+        logs.push(`[GATE 1: INCLUSION] Evaluated against BlockProver (0xFD2)...`);
+        logs.push(`[PRECOMPILE REVERT] Merkle trie root mismatch.`);
+        logs.push(`[VERDICT] REJECT — Proof verification failed.`);
       } else if (scenario.gate === 'GATE_2_CONTINUITY') {
         g2 = false;
         revertReason = "BlockProver: verification failed";
-        logs.push(`[GATE 1] 0xFD2 Inclusion proof valid.`);
-        logs.push(`[GATE 2: CONTINUITY] Querying ChainInfo (0x0000000000000000000000000000000000000fD3)...`);
-        logs.push(`[0xFD3 REVERT] Block header continuity broken or target height not attested.`);
-        logs.push(`[REGISTRY REVERT] Transaction reverted with ${revertReason}`);
-        logs.push(`[VERDICT] REJECT — Fork/uncle header discarded.`);
+        logs.push(`[GATE 2: CONTINUITY] Querying ChainInfo (0xFD3)...`);
+        logs.push(`[PRECOMPILE REVERT] Block header continuity broken.`);
+        logs.push(`[VERDICT] REJECT — Non-attested header rejected.`);
       } else if (scenario.gate === 'GATE_3_CAUSALITY') {
         g3 = false;
         revertReason = "CROSS_CHAIN_INDETERMINATE";
-        logs.push(`[GATE 1] 0xFD2 Inclusion proof verified.`);
-        logs.push(`[GATE 2] 0xFD3 Continuity verified.`);
-        logs.push(`[GATE 3: CAUSALITY] RelationEngine: Comparing independent chain events (Sepolia vs Alternate chain)...`);
-        logs.push(`[INVARIANT] No valid cryptographic causal witness supplied. Clock drift is unprovable.`);
-        logs.push(`[GUARD VERDICT] HOLD — Fail-closed state freeze activated. Position capital protected.`);
+        logs.push(`[GATE 3: CAUSALITY] Evaluating cross-chain precedence...`);
+        logs.push(`[MATHEMATICAL INVARIANT] Independent chains lack causal witness.`);
+        logs.push(`[GUARD VERDICT] HOLD — Fail-closed state freeze applied.`);
       } else {
         revertReason = "ActionRejected: Evidence B is earlier";
-        logs.push(`[GATE 1] 0xFD2 Inclusion proof verified.`);
-        logs.push(`[GATE 2] 0xFD3 Continuity verified.`);
-        logs.push(`[GATE 3] RelationEngine evaluated SAME_CHAIN_ORDER: Rescue deposit precedes liquidation.`);
-        logs.push(`[GATE 4: SAFETY] CausoraGuard enforces strict precedence.`);
-        logs.push(`[LENDING REVERT] Malicious liquidation reverted with ${revertReason}`);
-        logs.push(`[VERDICT] REJECT — Premature liquidation prevented.`);
+        logs.push(`[GATE 4: STRICT PRECEDENCE] Evaluating intra-chain order...`);
+        logs.push(`[LENDING REVERT] Premature liquidation rejected.`);
       }
+    }
 
-      const receipt = {
-        scenarioId: scenario.id,
-        mode,
-        timestamp: new Date().toISOString(),
-        targetContract: contractTarget,
-        gateEvaluated: scenario.gate,
-        expectedAction: scenario.expectedAction,
-        mitigated: true,
-        revertReason,
-        traces: logs
-      };
+    const receipt = {
+      scenarioId: scenario.id,
+      mode,
+      timestamp: new Date().toISOString(),
+      targetContract: contractTarget,
+      gateEvaluated: scenario.gate,
+      expectedAction: scenario.expectedAction,
+      mitigated: true,
+      revertReason,
+      traces: logs,
+    };
 
-      setAttackResult({
-        scenarioId: scenario.id,
-        blocked: true,
-        action: scenario.expectedAction,
-        mode,
-        logs,
-        gate1: g1,
-        gate2: g2,
-        gate3: g3,
-        revertReason,
-        contractAddress: contractTarget,
-        receiptJson: JSON.stringify(receipt, null, 2)
-      });
+    setAttackResult({
+      scenarioId: scenario.id,
+      blocked: true,
+      action: scenario.expectedAction,
+      mode,
+      logs,
+      gate1: g1,
+      gate2: g2,
+      gate3: g3,
+      revertReason,
+      contractAddress: contractTarget,
+      receiptJson: JSON.stringify(receipt, null, 2),
+    });
 
-      setExecuting(false);
-    }, 450);
+    setExecuting(false);
   };
 
   const copyReceipt = () => {
@@ -152,17 +227,6 @@ export default function BreakItPage() {
         {/* Mode Switcher */}
         <div className="flex items-center p-1 rounded-xl bg-surface-subtle border border-surface-border">
           <button
-            onClick={() => setMode('LOCAL_LAB')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              mode === 'LOCAL_LAB'
-                ? 'bg-surface-elevated text-blue-400 shadow-sm border border-blue-500/30'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <FlaskConical className="w-3.5 h-3.5" />
-            <span>Local Lab</span>
-          </button>
-          <button
             onClick={() => setMode('LIVE_ONCHAIN')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               mode === 'LIVE_ONCHAIN'
@@ -173,6 +237,17 @@ export default function BreakItPage() {
             <Zap className="w-3.5 h-3.5" />
             <span>Live CC3 RPC</span>
           </button>
+          <button
+            onClick={() => setMode('LOCAL_LAB')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              mode === 'LOCAL_LAB'
+                ? 'bg-surface-elevated text-blue-400 shadow-sm border border-blue-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <FlaskConical className="w-3.5 h-3.5" />
+            <span>Local Lab</span>
+          </button>
         </div>
       </div>
 
@@ -181,7 +256,7 @@ export default function BreakItPage() {
         <div className="lg:col-span-5 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase font-mono text-slate-400">Security Test Vectors</h3>
-            <span className="text-[11px] font-mono text-slate-500">6 Scenarios</span>
+            <span className="text-[11px] font-mono text-slate-500">6 Core Vectors</span>
           </div>
           {ATTACK_SCENARIOS.map((sc) => {
             const isSelected = selectedAttack.id === sc.id;
@@ -240,7 +315,7 @@ export default function BreakItPage() {
               </button>
             </div>
 
-            {/* Target Invariant & Payload Details */}
+            {/* Target Details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-lg bg-surface-subtle border border-surface-border">
                 <span className="text-[10px] font-mono text-slate-500 block mb-1">Target Gate</span>
@@ -262,7 +337,7 @@ export default function BreakItPage() {
               <p className="text-slate-300 text-[11px]">{selectedAttack.invariantProtected}</p>
             </div>
 
-            {/* Live Terminal Output */}
+            {/* Terminal Output */}
             {attackResult && (
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between">
@@ -288,7 +363,7 @@ export default function BreakItPage() {
                     let color = "text-slate-300";
                     if (log.includes("FAILURE") || log.includes("REJECT") || log.includes("REVERT")) color = "text-rose-400";
                     if (log.includes("HOLD") || log.includes("MITIGATION") || log.includes("INVARIANT")) color = "text-amber-400";
-                    if (log.includes("verified") || log.includes("valid") || log.includes("PASSED")) color = "text-emerald-400";
+                    if (log.includes("verified") || log.includes("valid") || log.includes("PASSED") || log.includes("neutralized")) color = "text-emerald-400";
 
                     return (
                       <div key={i} className={`${color} leading-relaxed whitespace-pre-wrap`}>

@@ -31,6 +31,17 @@ export class CausalWitnessBuilder {
     };
   }
 
+  static createConsumptionPayload(witness: CausalWitness): { data: string; payloadHash: string; eventSig: string } {
+    const coder = ethers.AbiCoder.defaultAbiCoder();
+    const data = coder.encode(
+      ['bytes32', 'bytes32', 'uint64', 'bytes32'],
+      [witness.parentDigest, witness.capabilityHash, witness.sequenceNumber, witness.stateCommitment]
+    );
+    const payloadHash = ethers.keccak256(data);
+    const eventSig = ethers.keccak256(ethers.toUtf8Bytes("CausalityConsumed(bytes32,bytes32,uint64,bytes32)"));
+    return { data, payloadHash, eventSig };
+  }
+
   static empty(): CausalWitness {
     return {
       parentDigest: ethers.ZeroHash,

@@ -1,10 +1,14 @@
 {
-  "generatedAt": "2026-09-12T17:03:00Z",
-  "network": "Creditcoin CC3 Testnet",
-  "registryAdmissionGas": 74210,
-  "relationClassificationGas": 28430,
-  "guardPolicyEvaluationGas": 24150,
-  "vaultCollateralFreezeGas": 21300,
-  "totalEndToEndVerificationGas": 148090,
-  "comparisonAgainstOptimisticFraudProofGas": "148k CC3 vs 1.2M+ fraud challenge"
+  "generator": "scripts/generate-evidence.ts",
+  "generatedAt": "2026-09-12T18:38:38.922Z",
+  "network": "Creditcoin CC3 Testnet Local Testbed",
+  "metrics": {
+    "registryAdmissionGas": 290510,
+    "admitEvidenceTxHash": "0x8c0804154a35c82697f64216f11fe33a6dcc6e5588c5f5070190bcb69cc36e95",
+    "vaultDepositGas": 73940,
+    "createPositionGas": 182898,
+    "raceResolutionWithVaultFreezeGas": 174072,
+    "raceResolutionTxHash": "0x9d0cead8b9de6f2b867dd78715c80499d86789cb2c606b7b91291a68afdbf94c",
+    "totalEndToEndResolutionGas": 464582
+  }
 }

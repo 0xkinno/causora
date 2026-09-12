@@ -1,8 +1,10 @@
 {
-  "generatedAt": "2026-09-12T17:03:00Z",
-  "blockProverPrecompileExecutionMs": 14,
-  "receiptProverPrecompileExecutionMs": 11,
-  "relationEngineExecutionMs": 3,
-  "causoraGuardDecisionMs": 2,
-  "totalOnChainResolutionLatencyMs": 30
+  "generator": "scripts/generate-evidence.ts",
+  "generatedAt": "2026-09-12T18:38:38.929Z",
+  "environment": "Controlled execution testbed",
+  "components": {
+    "queryIdComputationMs": 2,
+    "relationEngineClassificationMs": 4,
+    "note": "EVM execution latency measured locally. Asynchronous external Attestcoin prover & RPC roundtrips depend on external network conditions and are reported separately."
+  }
 }

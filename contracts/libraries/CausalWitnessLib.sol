@@ -7,6 +7,8 @@ import {ICausoraRegistry} from "../interfaces/ICausoraRegistry.sol";
 /// @title CausalWitnessLib
 /// @notice Cryptographic verification of causal witnesses between independent chains
 library CausalWitnessLib {
+    bytes32 public constant CAUSALITY_CONSUMED_SIG = keccak256("CausalityConsumed(bytes32,bytes32,uint64,bytes32)");
+
     /// @dev Verifies whether Event B has a legitimate cryptographic causal dependency on Event A
     /// @param evidenceA The presumed earlier event
     /// @param evidenceB The presumed later event
@@ -34,7 +36,6 @@ library CausalWitnessLib {
         bytes32 expectedDigestA = keccak256(
             abi.encode(evidenceA.chainKey, evidenceA.blockHeight, evidenceA.queryId, evidenceA.payloadHash)
         );
-        
         if (witness.parentDigest != expectedDigestA) {
             return (false, "Witness parentDigest does not match Evidence A");
         }
@@ -47,11 +48,19 @@ library CausalWitnessLib {
             return (false, "Invalid state commitment in causal witness");
         }
 
-        // 5. Verify that Event B payload actually exists
-        if (evidenceB.payloadHash == bytes32(0)) {
-            return (false, "Event B payload is empty or unverified");
+        // 5. Hardened verification: Event B must be CausalityConsumed event and its admitted payload
+        // MUST cryptographically commit to the exact witness originating from Event A
+        if (evidenceB.eventSig != CAUSALITY_CONSUMED_SIG) {
+            return (false, "Event B is not a verified CausalityConsumed event");
         }
 
-        return (true, "Valid cryptographic causal dependency proven");
+        bytes32 expectedPayloadHashB = keccak256(
+            abi.encode(witness.parentDigest, witness.capabilityHash, witness.sequenceNumber, witness.stateCommitment)
+        );
+        if (evidenceB.payloadHash != expectedPayloadHashB) {
+            return (false, "Event B payload does not commit to Event A causal witness");
+        }
+
+        return (true, "Valid cryptographic causal dependency proven: Event B consumed Event A capability");
     }
 }

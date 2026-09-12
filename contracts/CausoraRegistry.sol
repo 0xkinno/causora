@@ -10,14 +10,14 @@ import {EvmV1Decoder} from "./libraries/EvmV1Decoder.sol";
 import {EvidenceDigest} from "./libraries/EvidenceDigest.sol";
 
 /// @title CausoraRegistry
-/// @notice Master registry for Attestcoin-proven foreign events, source contract permissions, and replay protection
+/// @notice Master registry for Attestcoin-proven foreign events, hardened source contracts, and replay protection
 contract CausoraRegistry is CausoraASCBase, ICausoraRegistry, Ownable {
-    /// @notice Whitelisted source contracts: chainKey => emitter => SourceKind
-    mapping(uint64 => mapping(address => SourceKind)) public sourceContracts;
-    
+    /// @notice Whitelisted source contracts: chainKey => emitter => SourceRegistration
+    mapping(uint64 => mapping(address => SourceRegistration)) public sourceRegistrations;
+
     /// @notice Admitted evidence store: queryId => EventEvidence
     mapping(bytes32 => EventEvidence) public evidenceRecords;
-    
+
     /// @notice List of all admitted queryIds
     bytes32[] public admittedQueryIds;
 
@@ -25,34 +25,51 @@ contract CausoraRegistry is CausoraASCBase, ICausoraRegistry, Ownable {
     error SourceTransactionReverted(uint8 receiptStatus);
     error UnsupportedTransactionType(uint8 txType);
     error NoLogsInTransaction();
-    error UnregisteredEmitterLog(address emitter);
+    error ExpectedEventNotFound(uint64 chainKey);
+    error AmbiguousEventLogs(uint64 chainKey, uint256 matchCount);
     error ZeroAddress();
+    error ZeroEventSignature();
 
-    constructor() Ownable(msg.sender) {
-        // Pre-register canonical testnet source kinds for Sepolia (chainKey 1) and Mainnet (chainKey 3)
-    }
+    constructor() Ownable(msg.sender) {}
 
-    /// @notice Whitelists an external source contract for a specific chainKey
+    /// @notice Whitelists an external source contract with expected event signature
     function registerSource(
         uint64 chainKey,
         address emitter,
         SourceKind kind,
+        bytes32 expectedEventSignature,
         string calldata description
-    ) external onlyOwner {
+    ) external override onlyOwner {
         if (emitter == address(0)) revert ZeroAddress();
-        sourceContracts[chainKey][emitter] = kind;
-        emit SourceRegistered(chainKey, emitter, kind, description);
+        if (expectedEventSignature == bytes32(0)) revert ZeroEventSignature();
+
+        sourceRegistrations[chainKey][emitter] = SourceRegistration({
+            kind: kind,
+            expectedEventSignature: expectedEventSignature,
+            description: description,
+            exists: true
+        });
+
+        emit SourceRegistered(chainKey, emitter, kind, expectedEventSignature, description);
     }
 
     /// @notice Removes a source contract from the whitelist
     function removeSource(uint64 chainKey, address emitter) external onlyOwner {
-        delete sourceContracts[chainKey][emitter];
+        delete sourceRegistrations[chainKey][emitter];
         emit SourceRemoved(chainKey, emitter);
     }
 
     function isSourceRegistered(uint64 chainKey, address emitter) external view override returns (bool, SourceKind) {
-        SourceKind kind = sourceContracts[chainKey][emitter];
-        return (kind != SourceKind.None, kind);
+        SourceRegistration memory reg = sourceRegistrations[chainKey][emitter];
+        return (reg.exists, reg.kind);
+    }
+
+    function getSourceRegistration(
+        uint64 chainKey,
+        address emitter
+    ) external view override returns (SourceKind kind, bytes32 expectedEventSignature, string memory description) {
+        SourceRegistration memory reg = sourceRegistrations[chainKey][emitter];
+        return (reg.kind, reg.expectedEventSignature, reg.description);
     }
 
     function getEvidence(bytes32 queryId) external view override returns (EventEvidence memory) {
@@ -76,12 +93,44 @@ contract CausoraRegistry is CausoraASCBase, ICausoraRegistry, Ownable {
         return admittedQueryIds.length;
     }
 
-    /// @notice Admits and records an Attestcoin-proven transaction event
-    /// @param chainKey Attestcoin source chain identifier (1 = Sepolia, 3 = Mainnet)
-    /// @param blockHeight Source block number
-    /// @param encodedTransaction ABI-encoded EVM transaction & receipt bytes
-    /// @param merkleProof Inclusion proof
-    /// @param continuityProof Block continuity proof
+    /// @dev Authenticates logs against registered source contracts and strict event signature
+    function _authenticateReceiptLog(
+        uint64 chainKey,
+        IEvmV1Decoder.LogEntry[] memory logs
+    ) internal view returns (IEvmV1Decoder.LogEntry memory matchedLog) {
+        bool foundRegisteredEmitter = false;
+        address firstUnregisteredEmitter = address(0);
+        uint256 matchCount = 0;
+        uint256 matchedLogIndex = 0;
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            IEvmV1Decoder.LogEntry memory logEntry = logs[i];
+            SourceRegistration memory reg = sourceRegistrations[chainKey][logEntry.address_];
+            if (reg.exists) {
+                foundRegisteredEmitter = true;
+                if (logEntry.topics.length > 0 && logEntry.topics[0] == reg.expectedEventSignature) {
+                    matchCount++;
+                    matchedLogIndex = i;
+                }
+            } else if (firstUnregisteredEmitter == address(0)) {
+                firstUnregisteredEmitter = logEntry.address_;
+            }
+        }
+
+        if (!foundRegisteredEmitter) {
+            revert SourceNotRegistered(chainKey, firstUnregisteredEmitter);
+        }
+        if (matchCount == 0) {
+            revert ExpectedEventNotFound(chainKey);
+        }
+        if (matchCount > 1) {
+            revert AmbiguousEventLogs(chainKey, matchCount);
+        }
+
+        matchedLog = logs[matchedLogIndex];
+    }
+
+    /// @notice Admits and records an Attestcoin-proven transaction event with hardened event authentication
     function admitEvidence(
         uint64 chainKey,
         uint64 blockHeight,
@@ -125,18 +174,13 @@ contract CausoraRegistry is CausoraASCBase, ICausoraRegistry, Ownable {
             revert NoLogsInTransaction();
         }
 
-        // 5. Authenticate emitter
-        IEvmV1Decoder.LogEntry memory primaryLog = receipt.receiptLogs[0];
-        SourceKind kind = sourceContracts[chainKey][primaryLog.address_];
-        if (kind == SourceKind.None) {
-            revert SourceNotRegistered(chainKey, primaryLog.address_);
-        }
-
-        bytes32 eventSig = primaryLog.topics.length > 0 ? primaryLog.topics[0] : bytes32(0);
+        // 5. Search logs and authenticate source event (Priority 3: No blind receiptLogs[0])
+        IEvmV1Decoder.LogEntry memory primaryLog = _authenticateReceiptLog(chainKey, receipt.receiptLogs);
+        bytes32 eventSig = primaryLog.topics[0];
         bytes32 payloadHash = keccak256(primaryLog.data);
         bytes32 txHash = keccak256(encodedTransaction);
 
-        // 6. Record admitted evidence
+        // 6. Record admitted evidence bound strictly to the authentic event
         EventEvidence memory evidence = EventEvidence({
             chainKey: chainKey,
             blockHeight: blockHeight,
