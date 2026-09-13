@@ -1,4 +1,22 @@
 {
+  "measuredAt": "2026-09-13T13:59:52.409Z",
+  "sampleWindow": "120 samples over 4 hours (continuous CC3 frontier monitoring)",
+  "attestationLag": {
+    "sepolia": {
+      "p50": "39 blocks (~468s)",
+      "p90": "47 blocks (~564s)",
+      "p99": "57 blocks (~684s)",
+      "currentHeight": 11696300,
+      "currentLag": "39 blocks"
+    },
+    "mainnet": {
+      "p50": "39 blocks (~468s)",
+      "p90": "45 blocks (~540s)",
+      "p99": "53 blocks (~636s)",
+      "currentHeight": 25968930,
+      "currentLag": "39 blocks"
+    }
+  },
   "benchmarks": [
     {
       "operation": "ProofBuilder API Response",

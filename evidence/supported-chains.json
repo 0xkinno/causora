@@ -1,19 +1,22 @@
 {
+  "verifiedAt": "2026-09-13T13:59:50.699Z",
+  "precompile": "0x0000000000000000000000000000000000000fD3",
+  "rpcUrl": "https://rpc.cc3-testnet.creditcoin.network",
   "chains": [
-    {
-      "chainKey": 1,
-      "chainId": 11155111,
-      "chainName": "Ethereum Sepolia",
-      "encoding": 1,
-      "role": "Active Source Chain for Collateral & Lending Events"
-    },
     {
       "chainKey": 3,
       "chainId": 1,
-      "chainName": "Ethereum Mainnet",
-      "encoding": 1,
+      "chainName": "Ethereum",
+      "chainEncoding": 1,
       "role": "Source Chain for Real DeFi Liquidation & Settlement Events"
+    },
+    {
+      "chainKey": 1,
+      "chainId": 11155111,
+      "chainName": "Sepolia ethereum",
+      "chainEncoding": 1,
+      "role": "Active Source Chain for Collateral & Lending Events"
     }
   ],
-  "verifiedAt": "2026-09-12T08:07:20.690Z"
+  "rawReturn": "chainKey=3: chainId=1 (Ethereum, encoding=1); chainKey=1: chainId=11155111 (Sepolia ethereum, encoding=1)"
 }

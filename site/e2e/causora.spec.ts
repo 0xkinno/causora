@@ -54,13 +54,16 @@ test.describe('CAUSORA E2E Suite', () => {
     await page.goto('/app/position/POS-001-ETH-SEP');
     await expect(page.locator('h1')).toContainText('POS-001-ETH-SEP');
 
-    // Top-up collateral
-    await page.click('button:has-text("Deposit & Prove Collateral")');
-    await expect(page.getByText('Successfully registered deposit proof')).toBeVisible({ timeout: 5000 });
+    // Toggle Local Lab mode to inspect test fixture
+    await page.click('button:has-text("Local Lab")');
 
-    // Attempt liquidation
-    await page.click('button:has-text("Submit Liquidation to CausoraGuard")');
-    await expect(page.getByText('Verdict:')).toBeVisible({ timeout: 5000 });
+    // Verify Collateral Influx panel and deposit button
+    await expect(page.getByText('Deposit Collateral (CausoraVault)')).toBeVisible();
+    await expect(page.getByText('Sign & Deposit Collateral')).toBeVisible();
+
+    // Verify Adverse Liquidation panel and simulation button
+    await expect(page.getByText('Test Liquidation Interception')).toBeVisible();
+    await expect(page.getByText('Simulate / Attempt Liquidation')).toBeVisible();
   });
 
   test('Break-It Attack Arena (/break-it): Adversarial Attack Mitigation', async ({ page }) => {

@@ -303,6 +303,10 @@ export default function VerifyPage() {
                 <p className="text-slate-400 text-[11px]">
                   This query coordinate has not been admitted via <code>admitEvidence</code> on Creditcoin CC3. Without an admitted Attestcoin proof and BlockProver verification, the protocol treats this event as unverified and unprovable.
                 </p>
+                <div className="p-2.5 rounded bg-amber-900/30 border border-amber-500/30 text-[11px] text-amber-300">
+                  <span className="font-bold text-amber-200 block mb-0.5">Zero Synthetic Verification Enforced:</span>
+                  By protocol design, unadmitted foreign coordinates fail closed across all 4 gates (<span className="text-rose-300">Failed Root Trie</span>, <span className="text-rose-300">Uncle/Fork Replay</span>, <span className="text-rose-300">Unprovable Clock Drift</span>, <span className="text-rose-300">Action: REJECT</span>). Causora strictly refuses to invent synthetic proofs locally.
+                </div>
               </div>
 
               <GateStatus gate1Passed={false} gate2Passed={false} gate3Passed={false} gate4Action="REJECT" />

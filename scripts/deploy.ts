@@ -30,6 +30,16 @@ async function main() {
     process.exit(1);
   }
 
+  // Verify source chainKey catalogue against live ChainInfo precompile (0xFD3)
+  if (network.chainId === 102031n) {
+    const { verifyChainKeys } = require("./verifyChainKeys");
+    const verifyResult = await verifyChainKeys();
+    if (!verifyResult.ok) {
+      console.error("CRITICAL: ChainKey verification failed against 0xFD3. Aborting deployment.");
+      process.exit(1);
+    }
+  }
+
   const contractsRecord: Record<string, any> = {};
 
   async function recordDeployment(name: string, contract: any, constructorArgs: any[] = []) {

@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { useAccount, useChainId, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
+import { useAccount, useChainId, useSwitchChain, usePublicClient, useWalletClient, useWriteContract } from 'wagmi';
+import { creditcoinTestnet } from '@/lib/wagmi';
 import {
   CONTRACT_ADDRESSES,
   LENDING_POSITION_MANAGER_ABI,
@@ -62,6 +63,15 @@ const STAGES: { key: TxStep; label: string; num: number }[] = [
   { key: 'CONFIRMED', label: '5. Finalized', num: 5 },
 ];
 
+function safeChecksumAddress(addr?: string | null): `0x${string}` {
+  if (!addr) return '0x0000000000000000000000000000000000000000';
+  try {
+    return ethers.getAddress(addr.toLowerCase()) as `0x${string}`;
+  } catch {
+    return (addr.startsWith('0x') ? addr : `0x${addr}`) as `0x${string}`;
+  }
+}
+
 export function Web3ActionModal({
   isOpen,
   onClose,
@@ -74,7 +84,8 @@ export function Web3ActionModal({
   const chainId = useChainId();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
+  const { data: walletClient } = useWalletClient({ chainId: creditcoinTestnet.id });
+  const { writeContractAsync } = useWriteContract();
 
   const [actionType, setActionType] = useState<ActionType>(defaultAction);
   const [step, setStep] = useState<TxStep>('IDLE');
@@ -143,28 +154,124 @@ export function Web3ActionModal({
 
   const currentStageIdx = getStageIndex(step);
 
+  /**
+   * Unified transaction dispatcher:
+   * Layer 1: Wagmi useWriteContract (standard connector pipeline)
+   * Layer 2: Viem walletClient (if connector client is hydrated)
+   * Layer 3: Direct window.ethereum BrowserProvider (guaranteed MetaMask/EIP-1193 prompt)
+   */
+  const sendTransaction = async (params: {
+    address: `0x${string}`;
+    abi: any;
+    functionName: string;
+    args: any[];
+    gas?: bigint;
+  }): Promise<`0x${string}`> => {
+    setStep('AWAITING_WALLET_CONFIRMATION');
+
+    // Layer 1: Wagmi writeContractAsync
+    try {
+      if (writeContractAsync) {
+        const h = await writeContractAsync({
+          address: params.address,
+          abi: params.abi,
+          functionName: params.functionName,
+          args: params.args,
+          gas: params.gas,
+          chainId: creditcoinTestnet.id,
+        });
+        if (h) return h as `0x${string}`;
+      }
+    } catch (err: any) {
+      console.warn('Wagmi writeContractAsync attempt warning:', err);
+      // If user explicitly rejected in wallet, abort immediately
+      if (
+        err.message?.includes('User rejected') ||
+        err.message?.includes('denied') ||
+        err.code === 4001 ||
+        err.name === 'UserRejectedRequestError' ||
+        err.shortMessage?.includes('User rejected')
+      ) {
+        throw err;
+      }
+    }
+
+    // Layer 2: Viem walletClient
+    if (walletClient && address) {
+      try {
+        const h = await walletClient.writeContract({
+          address: params.address,
+          abi: params.abi,
+          functionName: params.functionName,
+          args: params.args,
+          gas: params.gas,
+          account: safeChecksumAddress(address),
+          chain: creditcoinTestnet,
+        });
+        if (h) return h;
+      } catch (err: any) {
+        console.warn('walletClient.writeContract attempt warning:', err);
+        if (
+          err.message?.includes('User rejected') ||
+          err.message?.includes('denied') ||
+          err.code === 4001 ||
+          err.name === 'UserRejectedRequestError' ||
+          err.shortMessage?.includes('User rejected')
+        ) {
+          throw err;
+        }
+      }
+    }
+
+    // Layer 3: Direct window.ethereum with Ethers v6 BrowserProvider
+    if (typeof window !== 'undefined' && (window as any).ethereum) {
+      try {
+        const browserProvider = new ethers.BrowserProvider((window as any).ethereum);
+        const signer = await browserProvider.getSigner();
+        const contract = new ethers.Contract(params.address, params.abi, signer);
+        const tx = await contract[params.functionName](
+          ...params.args,
+          params.gas ? { gasLimit: params.gas } : {}
+        );
+        return tx.hash as `0x${string}`;
+      } catch (err: any) {
+        console.warn('Direct BrowserProvider attempt error:', err);
+        throw err;
+      }
+    }
+
+    throw new Error('No active EVM wallet signer detected. Please connect MetaMask or an EVM wallet to Creditcoin CC3 Testnet.');
+  };
+
   const handleExecute = async () => {
-    if (!walletClient || !address) {
-      setErrorMessage('Please connect your EVM wallet to Creditcoin CC3 Testnet first.');
-      return;
-    }
-
-    if (chainId !== 102031) {
-      setErrorMessage('Wrong network. Please switch to Creditcoin CC3 Testnet (102031).');
-      return;
-    }
-
-    if (!publicClient) {
-      setErrorMessage('Public client for Creditcoin CC3 is unavailable.');
-      return;
-    }
-
+    // 1. Immediately enter active PREPARING step so user sees instant feedback
     setStep('PREPARING');
     setErrorMessage('');
     setTxHash('');
     setGasUsedStr('');
     setPostReadState('');
-    setStepMessage('Preparing and simulating contract call on CC3...');
+    setStepMessage('Connecting to wallet and preparing transaction on Creditcoin CC3...');
+
+    // 2. Validate connected address
+    if (!address) {
+      setStep('FAILED');
+      setErrorMessage('Please connect your EVM wallet to Creditcoin CC3 Testnet first.');
+      return;
+    }
+
+    // 3. Validate network
+    if (chainId !== 102031) {
+      setStep('FAILED');
+      setErrorMessage('Wrong network. Please switch your wallet to Creditcoin CC3 Testnet (Chain ID 102031).');
+      return;
+    }
+
+    // 4. Validate public client
+    if (!publicClient) {
+      setStep('FAILED');
+      setErrorMessage('Creditcoin CC3 RPC public client is currently unavailable. Please check your network connection.');
+      return;
+    }
 
     try {
       const posIdBn = BigInt(positionIdInput || '1001');
@@ -173,14 +280,14 @@ export function Web3ActionModal({
       // ACTION: MINT_TEST_TOKENS (Faucet)
       // ==========================================
       if (actionType === 'MINT_TEST_TOKENS') {
-        setStepMessage('Requesting wallet signature to mint 100 ctUSD on CC3...');
-        setStep('AWAITING_WALLET_CONFIRMATION');
+        const safeUser = safeChecksumAddress(address);
+        setStepMessage('Requesting wallet signature to mint 100 ctUSD on Creditcoin CC3...');
 
-        const hash = await walletClient.writeContract({
+        const hash = await sendTransaction({
           address: CONTRACT_ADDRESSES.mockERC20,
           abi: MOCK_ERC20_ABI,
           functionName: 'mint',
-          args: [address, ethers.parseEther('100')],
+          args: [safeUser, ethers.parseEther('100')],
         });
 
         setTxHash(hash);
@@ -196,7 +303,7 @@ export function Web3ActionModal({
           address: CONTRACT_ADDRESSES.mockERC20,
           abi: MOCK_ERC20_ABI,
           functionName: 'balanceOf',
-          args: [address],
+          args: [safeUser],
         }) as bigint;
 
         setStep('CONFIRMED');
@@ -212,7 +319,7 @@ export function Web3ActionModal({
           blockNumber: receipt.blockNumber.toString(),
           status: 'CONFIRMED',
           gasUsed: receipt.gasUsed.toString(),
-          details: `Minted 100 ctUSD to ${address.slice(0, 6)}...${address.slice(-4)}. New verified balance: ${ethers.formatEther(bal)} ctUSD.`
+          details: `Minted 100 ctUSD to ${safeUser.slice(0, 6)}...${safeUser.slice(-4)}. New verified balance: ${ethers.formatEther(bal)} ctUSD.`
         };
         onReceipt?.(recData);
         onSuccess?.();
@@ -221,11 +328,11 @@ export function Web3ActionModal({
       // ACTION 1: CREATE POSITION
       // ==========================================
       } else if (actionType === 'CREATE_POSITION') {
-        const borrower = (borrowerInput || address) as `0x${string}`;
+        const borrower = safeChecksumAddress(borrowerInput || address);
         const colWei = ethers.parseEther(collateralAmountInput || '10');
         const debtWei = ethers.parseEther(debtAmountInput || '5000');
 
-        setStepMessage('Simulating position registration against LendingPositionManager...');
+        setStepMessage('Simulating position registration against LendingPositionManager on CC3...');
         try {
           const existing = await publicClient.readContract({
             address: CONTRACT_ADDRESSES.lendingPositionManager,
@@ -243,9 +350,8 @@ export function Web3ActionModal({
         }
 
         setStepMessage('Requesting wallet signature to create position on CC3...');
-        setStep('AWAITING_WALLET_CONFIRMATION');
 
-        const hash = await walletClient.writeContract({
+        const hash = await sendTransaction({
           address: CONTRACT_ADDRESSES.lendingPositionManager,
           abi: LENDING_POSITION_MANAGER_ABI,
           functionName: 'createPosition',
@@ -293,6 +399,7 @@ export function Web3ActionModal({
       // ACTION 2: MARK POSITION AT RISK
       // ==========================================
       } else if (actionType === 'MARK_AT_RISK') {
+        const safeUser = safeChecksumAddress(address);
         setStepMessage('Verifying evaluator authorization on CC3...');
         const owner = await publicClient.readContract({
           address: CONTRACT_ADDRESSES.lendingPositionManager,
@@ -304,16 +411,16 @@ export function Web3ActionModal({
           address: CONTRACT_ADDRESSES.lendingPositionManager,
           abi: LENDING_POSITION_MANAGER_ABI,
           functionName: 'riskEvaluators',
-          args: [address],
+          args: [safeUser],
         }) as boolean;
 
-        if (address.toLowerCase() !== owner.toLowerCase() && !isEval) {
+        if (safeUser.toLowerCase() !== owner.toLowerCase() && !isEval) {
           setStepMessage('Authorizing connected wallet as risk evaluator on CC3...');
           try {
             const authRes = await fetch('/api/risk-evaluator', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ address }),
+              body: JSON.stringify({ address: safeUser }),
             });
             if (authRes.ok) {
               setStepMessage('Wallet authorized. Preparing markAtRisk call...');
@@ -324,9 +431,8 @@ export function Web3ActionModal({
         }
 
         setStepMessage('Requesting wallet signature to mark position AT_RISK on CC3...');
-        setStep('AWAITING_WALLET_CONFIRMATION');
 
-        const hash = await walletClient.writeContract({
+        const hash = await sendTransaction({
           address: CONTRACT_ADDRESSES.lendingPositionManager,
           abi: LENDING_POSITION_MANAGER_ABI,
           functionName: 'markAtRisk',
@@ -377,9 +483,8 @@ export function Web3ActionModal({
         const colWei = ethers.parseEther(collateralAmountInput || '10');
 
         setStepMessage('Requesting wallet signature to approve ctUSD transfer to CausoraVault...');
-        setStep('AWAITING_WALLET_CONFIRMATION');
 
-        const hash = await walletClient.writeContract({
+        const hash = await sendTransaction({
           address: CONTRACT_ADDRESSES.mockERC20,
           abi: MOCK_ERC20_ABI,
           functionName: 'approve',
@@ -399,7 +504,7 @@ export function Web3ActionModal({
           address: CONTRACT_ADDRESSES.mockERC20,
           abi: MOCK_ERC20_ABI,
           functionName: 'allowance',
-          args: [address, CONTRACT_ADDRESSES.causoraVault],
+          args: [safeChecksumAddress(address), CONTRACT_ADDRESSES.causoraVault],
         }) as bigint;
 
         setStep('CONFIRMED');
@@ -425,6 +530,7 @@ export function Web3ActionModal({
       // ==========================================
       } else if (actionType === 'DEPOSIT_COLLATERAL') {
         const colWei = ethers.parseEther(collateralAmountInput || '10');
+        const safeUser = safeChecksumAddress(address);
 
         // Check allowance first
         setStepMessage('Checking ctUSD allowance for CausoraVault...');
@@ -432,14 +538,13 @@ export function Web3ActionModal({
           address: CONTRACT_ADDRESSES.mockERC20,
           abi: MOCK_ERC20_ABI,
           functionName: 'allowance',
-          args: [address, CONTRACT_ADDRESSES.causoraVault],
+          args: [safeUser, CONTRACT_ADDRESSES.causoraVault],
         }) as bigint;
 
         if (currentAllowance < colWei) {
           setStepMessage('Step 1/2: Requesting approval signature for ctUSD...');
-          setStep('AWAITING_WALLET_CONFIRMATION');
 
-          const appHash = await walletClient.writeContract({
+          const appHash = await sendTransaction({
             address: CONTRACT_ADDRESSES.mockERC20,
             abi: MOCK_ERC20_ABI,
             functionName: 'approve',
@@ -456,9 +561,8 @@ export function Web3ActionModal({
 
         // Deposit into CausoraVault
         setStepMessage('Step 2/2: Requesting wallet signature to deposit collateral into CausoraVault...');
-        setStep('AWAITING_WALLET_CONFIRMATION');
 
-        const hash = await walletClient.writeContract({
+        const hash = await sendTransaction({
           address: CONTRACT_ADDRESSES.causoraVault,
           abi: CAUSORA_VAULT_ABI,
           functionName: 'depositCollateral',
@@ -506,6 +610,7 @@ export function Web3ActionModal({
         const qRescue = (queryIdRescue.startsWith('0x') ? queryIdRescue : `0x${queryIdRescue}`) as `0x${string}`;
         const qLiq = (queryIdLiquidation.startsWith('0x') ? queryIdLiquidation : `0x${queryIdLiquidation}`) as `0x${string}`;
         const extraColWei = ethers.parseEther('5');
+        const safeUser = safeChecksumAddress(address);
 
         const emptyWitness = {
           parentDigest: ethers.ZeroHash as `0x${string}`,
@@ -516,15 +621,14 @@ export function Web3ActionModal({
         };
 
         setStepMessage('Requesting wallet signature to evaluate and resolve collateral race on CC3...');
-        setStep('AWAITING_WALLET_CONFIRMATION');
 
         let hash: `0x${string}`;
         try {
-          hash = await walletClient.writeContract({
+          hash = await sendTransaction({
             address: CONTRACT_ADDRESSES.lendingPositionManager,
             abi: LENDING_POSITION_MANAGER_ABI,
             functionName: 'resolveCollateralRace',
-            args: [posIdBn, qRescue, qLiq, emptyWitness, extraColWei, address],
+            args: [posIdBn, qRescue, qLiq, emptyWitness, extraColWei, safeUser],
             gas: 350000n,
           });
         } catch (submitErr: any) {
@@ -612,17 +716,17 @@ export function Web3ActionModal({
       // ==========================================
       } else if (actionType === 'ATTEMPT_LIQUIDATION') {
         const currentBlock = await publicClient.getBlockNumber();
+        const safeUser = safeChecksumAddress(address);
 
         if (broadcastLiquidationOnChain) {
           // Broadcast actual on-chain transaction that reverts
           setStepMessage('Requesting wallet signature to broadcast liquidation attempt to CausoraVault on CC3...');
-          setStep('AWAITING_WALLET_CONFIRMATION');
 
-          const hash = await walletClient.writeContract({
+          const hash = await sendTransaction({
             address: CONTRACT_ADDRESSES.causoraVault,
             abi: CAUSORA_VAULT_ABI,
             functionName: 'executeProtectedTransition',
-            args: [posIdBn, 2 /* ALLOW_B */, address, address, ethers.parseEther('10')],
+            args: [posIdBn, 2 /* ALLOW_B */, safeUser, safeUser, ethers.parseEther('10')],
             gas: 200000n,
           });
 
@@ -671,8 +775,8 @@ export function Web3ActionModal({
               address: CONTRACT_ADDRESSES.causoraVault,
               abi: CAUSORA_VAULT_ABI,
               functionName: 'executeProtectedTransition',
-              args: [posIdBn, 2 /* ALLOW_B */, address, address, ethers.parseEther('10')],
-              account: address,
+              args: [posIdBn, 2 /* ALLOW_B */, safeUser, safeUser, ethers.parseEther('10')],
+              account: safeUser,
             });
             setStep('CONFIRMED');
             setStepMessage('Liquidation executed.');
@@ -723,7 +827,7 @@ export function Web3ActionModal({
       setStep('FAILED');
       const msg = err.shortMessage || err.message || String(err);
       setErrorMessage(
-        msg.includes('User rejected') || msg.includes('denied')
+        msg.includes('User rejected') || msg.includes('denied') || msg.includes('4001')
           ? 'Transaction was cancelled by user in wallet.'
           : msg
       );
@@ -1034,7 +1138,7 @@ export function Web3ActionModal({
         </div>
 
         {/* Real-time Status / Revert Display */}
-        {step !== 'IDLE' && (
+        {(step !== 'IDLE' || !!errorMessage) && (
           <div className="p-4 rounded-xl bg-surface-subtle border border-surface-border space-y-2 text-xs font-mono">
             <div className="flex items-center justify-between">
               <span className="text-slate-400 uppercase text-[10px]">Status:</span>
@@ -1102,19 +1206,35 @@ export function Web3ActionModal({
             {isPending ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Processing...</span>
+                <span>
+                  {step === 'AWAITING_WALLET_CONFIRMATION'
+                    ? 'Confirm in Wallet...'
+                    : step === 'CONFIRMING'
+                    ? 'Confirming on CC3...'
+                    : 'Processing...'}
+                </span>
               </>
             ) : (
               <>
                 <Zap className="w-3.5 h-3.5" />
                 <span>
-                  {actionType === 'CREATE_POSITION' && 'Sign & Create Position'}
-                  {actionType === 'APPROVE_COLLATERAL' && 'Sign ERC20 Approval'}
-                  {actionType === 'DEPOSIT_COLLATERAL' && 'Sign Vault Deposit'}
-                  {actionType === 'MARK_AT_RISK' && 'Sign Mark At Risk'}
-                  {actionType === 'RESOLVE_COLLATERAL_RACE' && 'Sign Resolve Race'}
-                  {actionType === 'ATTEMPT_LIQUIDATION' && (broadcastLiquidationOnChain ? 'Broadcast Liquidation on CC3' : 'Simulate Liquidation')}
-                  {actionType === 'MINT_TEST_TOKENS' && 'Sign Mint ctUSD'}
+                  {!isConnected
+                    ? 'Connect Wallet to Sign'
+                    : isWrongNetwork
+                    ? 'Switch to CC3 Network'
+                    : actionType === 'CREATE_POSITION'
+                    ? 'Sign & Create Position'
+                    : actionType === 'APPROVE_COLLATERAL'
+                    ? 'Sign ERC20 Approval'
+                    : actionType === 'DEPOSIT_COLLATERAL'
+                    ? 'Sign Vault Deposit'
+                    : actionType === 'MARK_AT_RISK'
+                    ? 'Sign Mark At Risk'
+                    : actionType === 'RESOLVE_COLLATERAL_RACE'
+                    ? 'Sign Resolve Race'
+                    : actionType === 'ATTEMPT_LIQUIDATION'
+                    ? (broadcastLiquidationOnChain ? 'Broadcast Liquidation on CC3' : 'Simulate Liquidation')
+                    : 'Sign Mint ctUSD'}
                 </span>
               </>
             )}

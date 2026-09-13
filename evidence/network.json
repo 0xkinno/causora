@@ -5,5 +5,9 @@
   "blockProverPrecompile": "0x0000000000000000000000000000000000000FD2",
   "chainInfoPrecompile": "0x0000000000000000000000000000000000000fD3",
   "proofBuilderUrl": "https://prover.cc3-testnet.creditcoin.network",
-  "explorerUrl": "https://creditcoin-testnet.blockscout.com"
+  "explorerUrl": "https://creditcoin-testnet.blockscout.com",
+  "checkpointVsOptimisticAttestationGap": {
+    "sepolia": "200 blocks (~2400s)",
+    "mainnet": "130 blocks (~1560s)"
+  }
 }

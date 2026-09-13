@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ethers } from 'ethers';
-import { useAccount, useChainId, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
+import { useAccount, useChainId, useSwitchChain, usePublicClient, useWalletClient, useWriteContract } from 'wagmi';
+import { creditcoinTestnet } from '@/lib/wagmi';
 import { MOCK_POSITIONS } from '@/lib/mockData';
 import { LendingPosition, ActionDecision, RelationType } from '@/lib/types';
 import { ActionBadge, RelationBadge } from '@/components/ActionBadge';
@@ -43,7 +44,8 @@ export default function PositionDetailPage() {
   const chainId = useChainId();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
+  const { data: walletClient } = useWalletClient({ chainId: creditcoinTestnet.id });
+  const { writeContractAsync } = useWriteContract();
 
   const [isLiveMode, setIsLiveMode] = useState<boolean>(true);
   const [position, setPosition] = useState<LendingPosition | null>(null);
@@ -137,14 +139,100 @@ export default function PositionDetailPage() {
     loadPositionData();
   }, [numericId, isLiveMode, address]);
 
+  function safeChecksumAddress(addr?: string | null): `0x${string}` {
+    if (!addr) return '0x0000000000000000000000000000000000000000';
+    try {
+      return ethers.getAddress(addr.toLowerCase()) as `0x${string}`;
+    } catch {
+      return (addr.startsWith('0x') ? addr : `0x${addr}`) as `0x${string}`;
+    }
+  }
+
+  const sendContractTx = async (params: {
+    address: `0x${string}`;
+    abi: any;
+    functionName: string;
+    args: any[];
+    gas?: bigint;
+  }): Promise<`0x${string}`> => {
+    try {
+      if (writeContractAsync) {
+        const h = await writeContractAsync({
+          address: params.address,
+          abi: params.abi,
+          functionName: params.functionName,
+          args: params.args,
+          gas: params.gas,
+          chainId: creditcoinTestnet.id,
+        });
+        if (h) return h as `0x${string}`;
+      }
+    } catch (err: any) {
+      console.warn('Wagmi writeContractAsync warning, falling back:', err);
+      if (
+        err.message?.includes('User rejected') ||
+        err.message?.includes('denied') ||
+        err.code === 4001 ||
+        err.name === 'UserRejectedRequestError' ||
+        err.shortMessage?.includes('User rejected')
+      ) {
+        throw err;
+      }
+    }
+
+    if (walletClient && address) {
+      try {
+        const h = await walletClient.writeContract({
+          address: params.address,
+          abi: params.abi,
+          functionName: params.functionName,
+          args: params.args,
+          gas: params.gas,
+          account: safeChecksumAddress(address),
+          chain: creditcoinTestnet,
+        });
+        if (h) return h;
+      } catch (err: any) {
+        console.warn('walletClient.writeContract warning, falling back:', err);
+        if (
+          err.message?.includes('User rejected') ||
+          err.message?.includes('denied') ||
+          err.code === 4001 ||
+          err.name === 'UserRejectedRequestError' ||
+          err.shortMessage?.includes('User rejected')
+        ) {
+          throw err;
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined' && (window as any).ethereum) {
+      try {
+        const browserProvider = new ethers.BrowserProvider((window as any).ethereum);
+        const signer = await browserProvider.getSigner();
+        const contract = new ethers.Contract(params.address, params.abi, signer);
+        const tx = await contract[params.functionName](
+          ...params.args,
+          params.gas ? { gasLimit: params.gas } : {}
+        );
+        return tx.hash as `0x${string}`;
+      } catch (err: any) {
+        console.warn('Direct BrowserProvider error:', err);
+        throw err;
+      }
+    }
+
+    throw new Error('No available EVM wallet signer detected. Please connect MetaMask to Creditcoin CC3 Testnet.');
+  };
+
   // Real Web3 Deposit Collateral
   const handleRealDeposit = async () => {
-    if (!walletClient || !address) {
+    if (!address) {
       alert("Please connect your wallet first.");
       return;
     }
     if (chainId !== 102031) {
-      alert("Please switch to Creditcoin CC3 Testnet (102031).");
+      alert("Please switch your wallet to Creditcoin CC3 Testnet (102031).");
       return;
     }
 
@@ -154,6 +242,7 @@ export default function PositionDetailPage() {
     try {
       const posIdBn = BigInt(numericId);
       const colWei = ethers.parseEther(depositAmount || '10');
+      const safeUser = safeChecksumAddress(address);
 
       // 1. Check Allowance
       setTxStep('CHECKING_ALLOWANCE');
@@ -162,12 +251,12 @@ export default function PositionDetailPage() {
           address: CONTRACT_ADDRESSES.mockERC20,
           abi: MOCK_ERC20_ABI,
           functionName: 'allowance',
-          args: [address, CONTRACT_ADDRESSES.causoraVault],
+          args: [safeUser, CONTRACT_ADDRESSES.causoraVault],
         })) as bigint;
 
         if (allowance < colWei) {
           setTxStep('AWAITING_APPROVAL_SIGNATURE');
-          const approveHash = await walletClient.writeContract({
+          const approveHash = await sendContractTx({
             address: CONTRACT_ADDRESSES.mockERC20,
             abi: MOCK_ERC20_ABI,
             functionName: 'approve',
@@ -180,7 +269,7 @@ export default function PositionDetailPage() {
 
       // 2. Deposit into CausoraVault
       setTxStep('AWAITING_DEPOSIT_SIGNATURE');
-      const depositHash = await walletClient.writeContract({
+      const depositHash = await sendContractTx({
         address: CONTRACT_ADDRESSES.causoraVault,
         abi: CAUSORA_VAULT_ABI,
         functionName: 'depositCollateral',
@@ -215,7 +304,7 @@ export default function PositionDetailPage() {
 
   // Real Web3 Liquidation Attempt / Simulation
   const handleRealLiquidation = async () => {
-    if (!walletClient || !address) {
+    if (!address) {
       alert("Please connect your wallet first.");
       return;
     }
@@ -225,6 +314,7 @@ export default function PositionDetailPage() {
 
     try {
       const posIdBn = BigInt(numericId);
+      const safeUser = safeChecksumAddress(address);
 
       // Attempt simulation on CC3
       if (publicClient) {
@@ -233,8 +323,8 @@ export default function PositionDetailPage() {
             address: CONTRACT_ADDRESSES.causoraVault,
             abi: CAUSORA_VAULT_ABI,
             functionName: 'executeProtectedTransition',
-            args: [posIdBn, 2 /* ALLOW_B */, address, address, ethers.parseEther('10')],
-            account: address,
+            args: [posIdBn, 2 /* ALLOW_B */, safeUser, safeUser, ethers.parseEther('10')],
+            account: safeUser,
           });
 
           setLiqResult({
@@ -320,7 +410,7 @@ export default function PositionDetailPage() {
               )}
             </div>
             <h1 className="text-2xl font-bold text-white font-display">
-              {position ? position.id : `Position #${numericId}`}
+              {position ? position.id : (rawId.startsWith('POS-') || rawId.startsWith('CC3-') ? rawId : `Position #${numericId}`)}
             </h1>
           </div>
         </div>

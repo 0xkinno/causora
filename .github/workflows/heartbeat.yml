@@ -1,0 +1,23 @@
+name: Causora Heartbeat
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch: {}
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - name: Read live attestation frontier (read-only, no key, no gas)
+        run: node scripts/heartbeat.js
+      - name: Commit the growing record
+        run: |
+          git config user.name "causora-heartbeat"
+          git config user.email "actions@github.com"
+          git add evidence/heartbeat.jsonl
+          git commit -m "heartbeat: $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "no change"
+          git push
