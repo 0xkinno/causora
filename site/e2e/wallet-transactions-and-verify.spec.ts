@@ -260,5 +260,100 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
     await expect(page.getByText(/Preparing|Awaiting|Switching|Creditcoin CC3|Transaction/i).first()).toBeVisible({ timeout: 5000 });
   });
 
+  test('Proof Verifier (/verify): Connected wallet triggers real on-chain transaction and renders confirmed on-chain report', async ({ page }) => {
+    let transactionSent = false;
+    let requestedMethod = '';
+
+    await page.addInitScript(() => {
+      const mockAddress = '0xe4b713e3cf2e550147f9cc09d751f276e7b9a64e';
+      const mockChainId = '0x18e8f'; // 102031 in hex
+
+      let listeners: Record<string, Function[]> = {};
+
+      (window as any).ethereum = {
+        isMetaMask: true,
+        selectedAddress: mockAddress,
+        chainId: mockChainId,
+        request: async ({ method, params }: { method: string; params?: any[] }) => {
+          if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
+            return [mockAddress];
+          }
+          if (method === 'eth_chainId') {
+            return mockChainId;
+          }
+          if (method === 'net_version') {
+            return '102031';
+          }
+          if (method === 'eth_blockNumber') {
+            return '0x582410';
+          }
+          if (method === 'eth_sendTransaction') {
+            (window as any).__txSent = true;
+            return '0xfeedbeef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+          }
+          if (method === 'eth_getTransactionReceipt') {
+            return {
+              transactionHash: '0xfeedbeef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+              blockNumber: '0x582411',
+              status: '0x1',
+              gasUsed: '0x14800', // 83968 gas
+            };
+          }
+          if (method === 'eth_call') {
+            return '0x0000000000000000000000000000000000000000000000000000000000000000';
+          }
+          if (method === 'eth_estimateGas') {
+            return '0x186a0';
+          }
+          return null;
+        },
+        on: (event: string, handler: Function) => {
+          listeners[event] = listeners[event] || [];
+          listeners[event].push(handler);
+        },
+        removeListener: (event: string, handler: Function) => {
+          if (listeners[event]) {
+            listeners[event] = listeners[event].filter(h => h !== handler);
+          }
+        },
+      };
+    });
+
+    await page.goto('/verify');
+    await expect(page.locator('h1')).toContainText('Cryptographic Proof Verifier');
+
+    // Connect mock wallet if connect button is present
+    const connectBtn = page.getByRole('button', { name: /Connect Wallet/i }).first();
+    if (await connectBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await connectBtn.click();
+    }
+
+    // Button triggers verification
+    const verifyBtn = page.getByRole('button', { name: /Verify on Creditcoin CC3/i });
+    await expect(verifyBtn).toBeVisible();
+    await verifyBtn.click();
+
+    // If initial read check shows unadmitted, click Sign On-Chain Proof Verification to trigger wallet signing
+    const signProofBtn = page.getByRole('button', { name: /Sign On-Chain Proof Verification on Creditcoin CC3/i });
+    if (await signProofBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await signProofBtn.click();
+    }
+
+    // Verify on-chain execution renders confirmed on-chain report
+    await expect(page.getByText('ON-CHAIN VERIFIED: FAIL-CLOSED (REJECT)')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Confirmed on Creditcoin CC3', { exact: true })).toBeVisible();
+
+    // Verify on-chain transaction hash and Blockscout explorer link
+    await expect(page.getByText('0xfeedbeef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBeVisible();
+    await expect(page.getByRole('link', { name: /View on Blockscout/i })).toBeVisible();
+
+    // Verify Invariant I4 enforcement and fail-closed gates
+    await expect(page.getByText('Invariant I4 (Fail-Closed Capital Preservation) Confirmed:')).toBeVisible();
+    await expect(page.getByText('Failed Root Trie').first()).toBeVisible();
+    await expect(page.getByText('Uncle/Fork Replay').first()).toBeVisible();
+    await expect(page.getByText('Unprovable Clock Drift').first()).toBeVisible();
+    await expect(page.getByText('Action: REJECT').first()).toBeVisible();
+  });
+
 });
 

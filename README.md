@@ -339,10 +339,10 @@ Every financial authorization in Causora is bound by formal invariants enforced 
 | **I1: Intra-Chain Ordinality** | $\text{Height}(A) < \text{Height}(B) \implies A \prec B$; if equal, $\text{Index}(A) < \text{Index}(B) \implies A \prec B$ | Prevents relayer submission-order front-running within the same chain | `RelationEngine.sol:L63-L75` |
 | **I2: Cross-Chain Indeterminacy** | $\text{Chain}(A) \ne \text{Chain}(B) \land \neg\text{Witness}(A, B) \implies A \sim B$ | Prevents predatory liquidations during uncoordinated cross-chain races | `RelationEngine.sol:L79-L84` |
 | **I3: Causal Commitment** | $\text{Witness}(A, B) \implies B.\text{payload} \supset \text{Digest}(A)$ | Prevents forged cross-chain witnesses and capability replay | `RelationEngine.sol:L95-L121` |
-| **I4: Fail-Closed Capital Preservation** | $R = \text{CROSS\_CHAIN\_INDETERMINATE} \implies \text{Guard} = \text{HOLD}$ | Prevents asset liquidation or unauthorized balance mutation when order is unprovable | `CausoraGuard.sol:L114-L123` |
+| **I4: Fail-Closed Capital Preservation** | $R = \text{CROSS-CHAIN-INDETERMINATE} \implies \text{Guard} = \text{HOLD}$ | Prevents asset liquidation or unauthorized balance mutation when order is unprovable | `CausoraGuard.sol:L114-L123` |
 | **I5: Vault Freeze Isolation** | $\text{Decision} = \text{HOLD} \implies \text{Vault.isHeld}(id) = \text{true}$ | Prevents owner or borrower from bypassing guard during race resolution | `CausoraVault.sol:L42-L48` |
 | **I6: Canonical Query Replay Protection** | $\text{QueryId} = \text{keccak256}(k, h, \text{index}) \implies \text{consumed}[\text{QueryId}] = 1$ | Prevents replay of historical proofs or reused Merkle paths | `CausoraASCBase.sol:L30-L46` |
-| **I7: Max Evidence Freshness** | $\text{block.timestamp} - \text{verifiedAt} \le \text{MAX\_EVIDENCE\_AGE}$ | Prevents stale historical proof resurrection to alter active position state | `CausoraGuard.sol:L74-L80` |
+| **I7: Max Evidence Freshness** | $\text{block.timestamp} - \text{verifiedAt} \le \text{MAX-EVIDENCE-AGE}$ | Prevents stale historical proof resurrection to alter active position state | `CausoraGuard.sol:L74-L80` |
 
 ---
 
