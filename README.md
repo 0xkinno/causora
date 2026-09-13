@@ -1,8 +1,5 @@
 # CAUSORA
 
-> **A Cross-Chain Orderability Firewall for DeFi on Creditcoin / Attestcoin Protocol.**
-> Accepts a financial action only when cryptographic evidence proves the required ordering, and otherwise returns `INDETERMINATE` instead of inventing a timeline.
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Creditcoin 3](https://img.shields.io/badge/Creditcoin%20CC3-Testnet%20(102031)-emerald)](https://creditcoin.org)
 [![Attestcoin Protocol](https://img.shields.io/badge/Attestcoin-Native%20Precompile%200xFD2-blueviolet)](https://docs.attestcoin.org)
@@ -10,16 +7,22 @@
 [![Attacks Neutralized](https://img.shields.io/badge/Attacks-27%2F27%20Neutralized-success)](./tests/attacks)
 [![Track](https://img.shields.io/badge/Track-DeFi%20%C2%B7%20Attestcoin%20Protocol%20(core)-orange)](https://dorahacks.io/hackathon/buidl-ctc-2026-fall/detail)
 
+---
+
+<div align="center">
+  <img src="docs/screenshots/banner.png" alt="Causora Protocol Banner" width="100%"/>
+</div>
+
+---
+
+> **A Cross-Chain Orderability Firewall for DeFi on Creditcoin / Attestcoin Protocol.**
+> Accepts a financial action only when cryptographic evidence proves the required ordering, and otherwise returns `INDETERMINATE` instead of inventing a timeline.
+
 > **BUIDL CTC 2026 Fall · Creditcoin & Credit Labs · Track: DeFi**
 > 
 > Attack count is generated, not typed: `npm run count:attacks` regenerates this badge's
 > number from `tests/attacks/` directly, and CI fails the build if the README's number and
 > the folder's actual count disagree.
-
-**This deployment is still proving things while nobody is watching it.** A GitHub Action
-reads the live Attestcoin attestation frontier for both source chains every 30 minutes and
-appends to [`evidence/heartbeat.jsonl`](evidence/heartbeat.jsonl) — 4 entries and
-counting as of this write-up. Reload that file; the count moves on its own.
 
 ---
 
@@ -44,25 +47,6 @@ Three commands a reviewer can run cold, requiring no wallet, no CTC, and zero se
    node scripts/heartbeat.js
    ```
    *Sweeps the live Attestcoin attestation and checkpoint frontiers, verifies open position states, and appends a real JSON record to `evidence/heartbeat.jsonl`.*
-
----
-
-## Verify this in 60 seconds
-
-| Claim | How to check it yourself |
-|---|---|
-| **Live CC3 Deployments** | Inspect contracts verified on Blockscout: [`CausoraRegistry`](https://creditcoin-testnet.blockscout.com/address/0x87F61f848EdD7C3e0752Ded3bf9C303E7c74BD81), [`CausoraGuard`](https://creditcoin-testnet.blockscout.com/address/0x4CABa84eF2D49dCFfDD5456AADEA5A42eB4a4699), [`LendingPositionManager`](https://creditcoin-testnet.blockscout.com/address/0x94B336Cdb7aDacffE270a8f1B607499Be3656518), [`CausoraVault`](https://creditcoin-testnet.blockscout.com/address/0x196a78ef8e039bD7E03C8d38694A0e5fB4EeBE92) |
-| **Active Proof of Life** | Check [`evidence/heartbeat.jsonl`](evidence/heartbeat.jsonl) commits produced automatically by [GitHub Actions](.github/workflows/heartbeat.yml) every 30 mins |
-| **All 27 Attacks Neutralized** | Run `npm test` or `npx hardhat test tests/attacks/01_SubmissionOrder.test.ts` through `27_VaultOwnerBypassAttack.test.ts` |
-| **ChainKey Integrity** | Run `npm run verify:chainkeys` against CC3 Testnet RPC `https://rpc.cc3-testnet.creditcoin.network` |
-| **Measured Gas & Latency** | Inspect raw receipts in [`evidence/gas-results.json`](evidence/gas-results.json) and [`evidence/proof-latency.json`](evidence/proof-latency.json) |
-| **Zero Claims Drift** | Run `npm run check:claims` to assert zero divergence between repository documentation and code ground truth |
-
----
-
-<div align="center">
-  <img src="docs/screenshots/banner.png" alt="Causora Protocol Banner" width="100%"/>
-</div>
 
 ---
 
@@ -141,7 +125,7 @@ Causora formally separates:
 
 ---
 
-## In Two Minutes
+## Test In Two Minutes
 
 1. **Connect**: Connect any EVM wallet; Causora detects Creditcoin CC3 Testnet (`102031`).
 2. **Observe**: Real-time event streams from Ethereum Sepolia (`chainKey: 1`) and Ethereum Mainnet (`chainKey: 3`).
@@ -180,6 +164,19 @@ Causora formally separates:
     </tr>
   </table>
 </div>
+
+---
+
+## Verifiable Claims
+
+| Claim | How to check it yourself |
+|---|---|
+| **Live CC3 Deployments** | Inspect contracts verified on Blockscout: [`CausoraRegistry`](https://creditcoin-testnet.blockscout.com/address/0x87F61f848EdD7C3e0752Ded3bf9C303E7c74BD81), [`CausoraGuard`](https://creditcoin-testnet.blockscout.com/address/0x4CABa84eF2D49dCFfDD5456AADEA5A42eB4a4699), [`LendingPositionManager`](https://creditcoin-testnet.blockscout.com/address/0x94B336Cdb7aDacffE270a8f1B607499Be3656518), [`CausoraVault`](https://creditcoin-testnet.blockscout.com/address/0x196a78ef8e039bD7E03C8d38694A0e5fB4EeBE92) |
+| **Active Proof of Life** | Check [`evidence/heartbeat.jsonl`](evidence/heartbeat.jsonl) commits produced automatically by [GitHub Actions](.github/workflows/heartbeat.yml) every 30 mins |
+| **All 27 Attacks Neutralized** | Run `npm test` or `npx hardhat test tests/attacks/01_SubmissionOrder.test.ts` through `27_VaultOwnerBypassAttack.test.ts` |
+| **ChainKey Integrity** | Run `npm run verify:chainkeys` against CC3 Testnet RPC `https://rpc.cc3-testnet.creditcoin.network` |
+| **Measured Gas & Latency** | Inspect raw receipts in [`evidence/gas-results.json`](evidence/gas-results.json) and [`evidence/proof-latency.json`](evidence/proof-latency.json) |
+| **Zero Claims Drift** | Run `npm run check:claims` to assert zero divergence between repository documentation and code ground truth |
 
 ---
 

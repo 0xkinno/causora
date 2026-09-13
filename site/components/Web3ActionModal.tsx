@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { useAccount, useChainId, useSwitchChain, usePublicClient, useWalletClient, useWriteContract } from 'wagmi';
-import { creditcoinTestnet } from '@/lib/wagmi';
+import { useAccount, useConnect, useChainId, useSwitchChain, usePublicClient, useWalletClient, useWriteContract } from 'wagmi';
+import { creditcoinTestnet, ensureCreditcoinNetwork } from '@/lib/wagmi';
 import {
   CONTRACT_ADDRESSES,
   LENDING_POSITION_MANAGER_ABI,
@@ -81,8 +81,9 @@ export function Web3ActionModal({
   onReceipt
 }: Web3ActionModalProps) {
   const { address, isConnected } = useAccount();
+  const { connectAsync, connectors } = useConnect();
   const chainId = useChainId();
-  const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const { switchChain, switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient({ chainId: creditcoinTestnet.id });
   const { writeContractAsync } = useWriteContract();
@@ -129,9 +130,18 @@ export function Web3ActionModal({
     }
   }, [initialPositionId]);
 
+  // Automatically prompt switch to Creditcoin CC3 if modal is open and on wrong network
+  useEffect(() => {
+    if (isOpen && isConnected && chainId !== creditcoinTestnet.id) {
+      ensureCreditcoinNetwork(switchChainAsync).catch((err) => {
+        console.warn('Auto-switch modal prompt dismissed or failed:', err);
+      });
+    }
+  }, [isOpen, isConnected, chainId]);
+
   if (!isOpen) return null;
 
-  const isWrongNetwork = isConnected && chainId !== 102031;
+  const isWrongNetwork = isConnected && chainId !== creditcoinTestnet.id;
 
   const resetState = () => {
     setStep('IDLE');
@@ -167,6 +177,12 @@ export function Web3ActionModal({
     args: any[];
     gas?: bigint;
   }): Promise<`0x${string}`> => {
+    // Proactively verify & switch to Creditcoin CC3 (102031) before any transaction
+    if (chainId !== creditcoinTestnet.id) {
+      await ensureCreditcoinNetwork(switchChainAsync);
+      await new Promise((r) => setTimeout(r, 600));
+    }
+
     setStep('AWAITING_WALLET_CONFIRMATION');
 
     // Layer 1: Wagmi writeContractAsync
@@ -226,7 +242,12 @@ export function Web3ActionModal({
     // Layer 3: Direct window.ethereum with Ethers v6 BrowserProvider
     if (typeof window !== 'undefined' && (window as any).ethereum) {
       try {
-        const browserProvider = new ethers.BrowserProvider((window as any).ethereum);
+        const eth = (window as any).ethereum;
+        const currentHex = eth.chainId;
+        if (currentHex && currentHex.toLowerCase() !== '0x18e8f') {
+          await ensureCreditcoinNetwork(switchChainAsync);
+        }
+        const browserProvider = new ethers.BrowserProvider(eth);
         const signer = await browserProvider.getSigner();
         const contract = new ethers.Contract(params.address, params.abi, signer);
         const tx = await contract[params.functionName](
@@ -259,11 +280,20 @@ export function Web3ActionModal({
       return;
     }
 
-    // 3. Validate network
-    if (chainId !== 102031) {
-      setStep('FAILED');
-      setErrorMessage('Wrong network. Please switch your wallet to Creditcoin CC3 Testnet (Chain ID 102031).');
-      return;
+    // 3. Validate & auto-switch network to Creditcoin CC3 Testnet (102031)
+    if (chainId !== creditcoinTestnet.id) {
+      setStepMessage('Prompting wallet to switch to Creditcoin CC3 Testnet (Chain ID 102031)...');
+      try {
+        await ensureCreditcoinNetwork(switchChainAsync);
+        await new Promise((r) => setTimeout(r, 600));
+      } catch (switchErr: any) {
+        setStep('FAILED');
+        setErrorMessage(
+          switchErr.message ||
+          'Failed to switch network. Please approve switching to Creditcoin CC3 Testnet (Chain ID 102031) in your wallet.'
+        );
+        return;
+      }
     }
 
     // 4. Validate public client
@@ -1199,8 +1229,40 @@ export function Web3ActionModal({
 
           <button
             type="button"
-            onClick={handleExecute}
-            disabled={isPending || isWrongNetwork || !isConnected}
+            onClick={async () => {
+              if (!isConnected) {
+                setStep('PREPARING');
+                setStepMessage('Connecting wallet...');
+                try {
+                  const connector = connectors[0];
+                  if (connector) {
+                    await connectAsync({ connector });
+                  }
+                  await ensureCreditcoinNetwork(switchChainAsync);
+                  setStep('IDLE');
+                  setStepMessage('');
+                } catch (cErr: any) {
+                  setStep('FAILED');
+                  setErrorMessage(cErr.message || 'Failed to connect wallet.');
+                }
+                return;
+              }
+              if (isWrongNetwork) {
+                setStep('PREPARING');
+                setStepMessage('Prompting wallet to switch to Creditcoin CC3 Testnet (102031)...');
+                try {
+                  await ensureCreditcoinNetwork(switchChainAsync);
+                  setStep('IDLE');
+                  setStepMessage('');
+                } catch (netErr: any) {
+                  setStep('FAILED');
+                  setErrorMessage(netErr.message || 'Failed to switch to Creditcoin CC3.');
+                }
+                return;
+              }
+              handleExecute();
+            }}
+            disabled={isPending}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs font-mono transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isPending ? (
@@ -1221,7 +1283,7 @@ export function Web3ActionModal({
                   {!isConnected
                     ? 'Connect Wallet to Sign'
                     : isWrongNetwork
-                    ? 'Switch to CC3 Network'
+                    ? 'Switch to CC3 Network & Sign'
                     : actionType === 'CREATE_POSITION'
                     ? 'Sign & Create Position'
                     : actionType === 'APPROVE_COLLATERAL'

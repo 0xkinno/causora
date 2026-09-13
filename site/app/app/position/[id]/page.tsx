@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ethers } from 'ethers';
 import { useAccount, useChainId, useSwitchChain, usePublicClient, useWalletClient, useWriteContract } from 'wagmi';
-import { creditcoinTestnet } from '@/lib/wagmi';
+import { creditcoinTestnet, ensureCreditcoinNetwork } from '@/lib/wagmi';
 import { MOCK_POSITIONS } from '@/lib/mockData';
 import { LendingPosition, ActionDecision, RelationType } from '@/lib/types';
 import { ActionBadge, RelationBadge } from '@/components/ActionBadge';
@@ -42,7 +42,7 @@ export default function PositionDetailPage() {
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+  const { switchChain, switchChainAsync, isPending: isSwitchingChain } = useSwitchChain();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient({ chainId: creditcoinTestnet.id });
   const { writeContractAsync } = useWriteContract();
@@ -155,6 +155,12 @@ export default function PositionDetailPage() {
     args: any[];
     gas?: bigint;
   }): Promise<`0x${string}`> => {
+    // Proactively verify & switch to Creditcoin CC3 (102031) before any transaction
+    if (chainId !== creditcoinTestnet.id) {
+      await ensureCreditcoinNetwork(switchChainAsync);
+      await new Promise((r) => setTimeout(r, 600));
+    }
+
     try {
       if (writeContractAsync) {
         const h = await writeContractAsync({
@@ -208,7 +214,12 @@ export default function PositionDetailPage() {
 
     if (typeof window !== 'undefined' && (window as any).ethereum) {
       try {
-        const browserProvider = new ethers.BrowserProvider((window as any).ethereum);
+        const eth = (window as any).ethereum;
+        const currentHex = eth.chainId;
+        if (currentHex && currentHex.toLowerCase() !== '0x18e8f') {
+          await ensureCreditcoinNetwork(switchChainAsync);
+        }
+        const browserProvider = new ethers.BrowserProvider(eth);
         const signer = await browserProvider.getSigner();
         const contract = new ethers.Contract(params.address, params.abi, signer);
         const tx = await contract[params.functionName](
@@ -231,9 +242,14 @@ export default function PositionDetailPage() {
       alert("Please connect your wallet first.");
       return;
     }
-    if (chainId !== 102031) {
-      alert("Please switch your wallet to Creditcoin CC3 Testnet (102031).");
-      return;
+    if (chainId !== creditcoinTestnet.id) {
+      try {
+        await ensureCreditcoinNetwork(switchChainAsync);
+        await new Promise((r) => setTimeout(r, 600));
+      } catch (switchErr: any) {
+        alert(switchErr.message || "Please switch your wallet to Creditcoin CC3 Testnet (102031).");
+        return;
+      }
     }
 
     setIsDepositing(true);
@@ -307,6 +323,15 @@ export default function PositionDetailPage() {
     if (!address) {
       alert("Please connect your wallet first.");
       return;
+    }
+    if (chainId !== creditcoinTestnet.id) {
+      try {
+        await ensureCreditcoinNetwork(switchChainAsync);
+        await new Promise((r) => setTimeout(r, 600));
+      } catch (switchErr: any) {
+        alert(switchErr.message || "Please switch your wallet to Creditcoin CC3 Testnet (102031).");
+        return;
+      }
     }
 
     setIsLiquidating(true);

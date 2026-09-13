@@ -20,7 +20,7 @@ import {
   Scale
 } from 'lucide-react';
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi';
-import { creditcoinTestnet } from '@/lib/wagmi';
+import { creditcoinTestnet, ensureCreditcoinNetwork } from '@/lib/wagmi';
 import { useTheme } from '@/components/ThemeProvider';
 
 export const Navbar: React.FC = () => {
@@ -30,7 +30,7 @@ export const Navbar: React.FC = () => {
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
-  const { switchChain } = useSwitchChain();
+  const { switchChain, switchChainAsync } = useSwitchChain();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -39,6 +39,15 @@ export const Navbar: React.FC = () => {
   }, []);
 
   const isWrongNetwork = isConnected && chainId !== creditcoinTestnet.id;
+
+  // Automatically request switch to Creditcoin CC3 if connected on wrong network (e.g. Ethereum Mainnet)
+  useEffect(() => {
+    if (mounted && isConnected && chainId !== creditcoinTestnet.id) {
+      ensureCreditcoinNetwork(switchChainAsync).catch((err) => {
+        console.warn('Auto-switch to Creditcoin CC3 prompt error or dismissed:', err);
+      });
+    }
+  }, [mounted, isConnected, chainId]);
 
   const navLinks = [
     { href: '/app', label: 'Protocol', icon: Activity },
@@ -52,11 +61,19 @@ export const Navbar: React.FC = () => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     const connector = connectors[0];
     if (connector) {
-      connect({ connector });
+      try {
+        await connect({ connector });
+      } catch (err) {
+        console.warn('Connect error:', err);
+      }
     }
+    // Proactively prompt switch/add Creditcoin CC3 Testnet
+    try {
+      await ensureCreditcoinNetwork(switchChainAsync);
+    } catch (_) {}
   };
 
   return (
@@ -133,8 +150,8 @@ export const Navbar: React.FC = () => {
           {mounted && isConnected && (
             isWrongNetwork ? (
               <button
-                onClick={() => switchChain({ chainId: creditcoinTestnet.id })}
-                className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-amber-950/80 border border-amber-600/50 text-amber-300 hover:bg-amber-900 transition-colors"
+                onClick={() => ensureCreditcoinNetwork(switchChainAsync)}
+                className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-amber-950/80 border border-amber-600/50 text-amber-300 hover:bg-amber-900 transition-colors animate-pulse"
                 title="Click to switch to Creditcoin CC3 Testnet"
               >
                 <AlertTriangle className="w-3 h-3 text-amber-400 animate-pulse" />

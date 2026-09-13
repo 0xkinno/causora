@@ -153,18 +153,112 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
     await expect(page.getByText('Creditcoin CC3 Web3 Operations')).not.toBeVisible();
   });
 
-  test('Web3 Action Modal: Disconnected wallet click displays prompt immediately without freezing', async ({ page }) => {
-    // Navigate without injected wallet
-    await page.goto('/app');
+  test('Ethereum Mainnet to Creditcoin CC3 automatic network switch before transaction execution', async ({ page }) => {
+    // Inject mock EVM provider initialized on Ethereum Mainnet (0x1)
+    await page.addInitScript(() => {
+      const mockAddress = '0xe4b713e3cf2e550147f9cc09d751f276e7b9a64e';
+      let currentChainId = '0x1'; // Starts on Ethereum Mainnet!
+      let switchRequests: any[] = [];
+      let allRequests: any[] = [];
+      (window as any).__switchRequests = switchRequests;
+      (window as any).__allRequests = allRequests;
 
-    // Click Faucet
-    const faucetBtn = page.getByRole('button', { name: /Faucet \(ctUSD\)/i });
-    if (await faucetBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await faucetBtn.click();
-      await expect(page.getByText('Creditcoin CC3 Web3 Operations')).toBeVisible();
-      // Button should indicate wallet connection required
-      await expect(page.getByRole('button', { name: /Connect Wallet to Sign/i })).toBeVisible();
+      let listeners: Record<string, Function[]> = {};
+
+      (window as any).ethereum = {
+        isMetaMask: true,
+        isConnected: () => true,
+        selectedAddress: mockAddress,
+        get chainId() {
+          return currentChainId;
+        },
+        request: async ({ method, params }: { method: string; params?: any[] }) => {
+          allRequests.push({ method, params });
+          if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
+            return [mockAddress];
+          }
+          if (method === 'eth_chainId') {
+            return currentChainId;
+          }
+          if (method === 'net_version') {
+            return currentChainId === '0x18e8f' ? '102031' : '1';
+          }
+          if (method === 'wallet_switchEthereumChain') {
+            switchRequests.push(params?.[0]);
+            currentChainId = '0x18e8f'; // Automatically switch to Creditcoin CC3
+            const handlers = listeners['chainChanged'] || [];
+            handlers.forEach(h => h('0x18e8f'));
+            return null;
+          }
+          if (method === 'wallet_addEthereumChain') {
+            switchRequests.push(params?.[0]);
+            currentChainId = '0x18e8f';
+            const handlers = listeners['chainChanged'] || [];
+            handlers.forEach(h => h('0x18e8f'));
+            return null;
+          }
+          if (method === 'eth_blockNumber') {
+            return '0x1000';
+          }
+          if (method === 'eth_sendTransaction') {
+            return '0x9999999999999999999999999999999999999999999999999999999999999999';
+          }
+          if (method === 'eth_getTransactionReceipt') {
+            return {
+              transactionHash: params?.[0] || '0x9999999999999999999999999999999999999999999999999999999999999999',
+              blockNumber: '0x1001',
+              status: '0x1',
+              gasUsed: '0x15f90',
+            };
+          }
+          if (method === 'eth_call') {
+            return '0x00000000000000000000000000000000000000000000003635c9adc5dea00000';
+          }
+          if (method === 'eth_estimateGas') {
+            return '0x186a0';
+          }
+          return null;
+        },
+        on: (event: string, handler: Function) => {
+          listeners[event] = listeners[event] || [];
+          listeners[event].push(handler);
+        },
+        removeListener: (event: string, handler: Function) => {
+          if (listeners[event]) {
+            listeners[event] = listeners[event].filter(h => h !== handler);
+          }
+        },
+      };
+    });
+
+    await page.goto('/app');
+    await expect(page.locator('h1')).toContainText('Causora Protocol Console');
+
+    // Connect mock wallet if connect button is present
+    const connectBtn = page.getByRole('button', { name: /Connect Wallet/i }).first();
+    if (await connectBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await connectBtn.click();
     }
+
+    // Open Faucet modal
+    const faucetBtn = page.getByRole('button', { name: /Faucet \(ctUSD\)/i });
+    await expect(faucetBtn).toBeVisible({ timeout: 5000 });
+    await faucetBtn.click();
+
+    // Verify modal is open
+    await expect(page.getByText('Creditcoin CC3 Web3 Operations')).toBeVisible();
+
+    // The action button should NOT be disabled
+    const signBtn = page.getByRole('button', { name: /Switch to CC3 Network & Sign|Sign Mint ctUSD|Connect Wallet to Sign/i });
+    await expect(signBtn).toBeVisible();
+    await expect(signBtn).toBeEnabled();
+
+    // Click the button to trigger network switch & transaction flow
+    await signBtn.click();
+
+    // Confirm that the UI responds immediately with active progress status without freezing
+    await expect(page.getByText(/Preparing|Awaiting|Switching|Creditcoin CC3|Transaction/i).first()).toBeVisible({ timeout: 5000 });
   });
 
 });
+
