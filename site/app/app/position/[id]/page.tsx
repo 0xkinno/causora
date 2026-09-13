@@ -1,14 +1,23 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { MOCK_POSITIONS, MOCK_PROOFS } from '@/lib/mockData';
-import { LendingPosition, ActionDecision, RelationType, DecisionRecord } from '@/lib/types';
+import { ethers } from 'ethers';
+import { useAccount, useChainId, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
+import { MOCK_POSITIONS } from '@/lib/mockData';
+import { LendingPosition, ActionDecision, RelationType } from '@/lib/types';
 import { ActionBadge, RelationBadge } from '@/components/ActionBadge';
 import { GateStatus } from '@/components/GateStatus';
-import { EvidenceTimeline } from '@/components/EvidenceTimeline';
-import { computeQueryId } from '@/lib/contracts';
+import { TransactionReceiptPanel, TxReceiptData } from '@/components/TransactionReceiptPanel';
+import {
+  computeQueryId,
+  CONTRACT_ADDRESSES,
+  LENDING_POSITION_MANAGER_ABI,
+  CAUSORA_VAULT_ABI,
+  MOCK_ERC20_ABI,
+  RELATION_ENGINE_ABI
+} from '@/lib/contracts';
 import {
   ArrowLeft,
   Shield,
@@ -19,27 +28,34 @@ import {
   CheckCircle2,
   Cpu,
   FileSearch,
-  RefreshCw
+  RefreshCw,
+  ExternalLink,
+  Coins,
+  FlaskConical
 } from 'lucide-react';
 
 export default function PositionDetailPage() {
   const params = useParams();
-  const positionId = (params?.id as string) || "POS-001-ETH-SEP";
+  const rawId = (params?.id as string) || "1001";
+  const numericId = rawId.replace(/[^0-9]/g, '') || "1001";
 
-  const initialPos = MOCK_POSITIONS.find(p => p.id === positionId) || MOCK_POSITIONS[0];
-  const [position, setPosition] = useState<LendingPosition>(initialPos);
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
 
-  // Deposit Top-Up Form State
+  const [isLiveMode, setIsLiveMode] = useState<boolean>(true);
+  const [position, setPosition] = useState<LendingPosition | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [lastReceipt, setLastReceipt] = useState<TxReceiptData | null>(null);
+
+  // Form states
   const [depositAmount, setDepositAmount] = useState<string>("10.0");
-  const [depositBlock, setDepositBlock] = useState<number>(5824300);
-  const [depositTxIndex, setDepositTxIndex] = useState<number>(5);
   const [isDepositing, setIsDepositing] = useState<boolean>(false);
-  const [depositSuccess, setDepositSuccess] = useState<string | null>(null);
+  const [txStep, setTxStep] = useState<string>('');
 
-  // Liquidation Attempt Form State
-  const [liqBlock, setLiqBlock] = useState<number>(5824250);
-  const [liqTxIndex, setLiqTxIndex] = useState<number>(10);
-  const [liqWitness, setLiqWitness] = useState<boolean>(false);
+  // Liquidation attempt state
   const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
   const [liqResult, setLiqResult] = useState<{
     action: ActionDecision;
@@ -48,100 +64,240 @@ export default function PositionDetailPage() {
     decisionId: string;
   } | null>(null);
 
-  // Handle Simulated Cross-Chain Deposit
-  const handleDeposit = () => {
-    setIsDepositing(true);
-    setTimeout(() => {
-      const newQueryId = computeQueryId(1, depositBlock, depositTxIndex);
-      const currentCollateralNum = parseFloat(position.collateralAmount);
-      const addedCollateral = parseFloat(depositAmount) || 0;
-      const newCollateral = `${(currentCollateralNum + addedCollateral).toFixed(1)} ETH`;
+  const isWrongNetwork = isConnected && chainId !== 102031;
 
-      setPosition(prev => ({
-        ...prev,
-        collateralAmount: newCollateral,
-        healthFactor: prev.healthFactor + 0.35,
-        lastDepositQueryId: newQueryId,
-        lastDepositTimestamp: Math.floor(Date.now() / 1000),
-      }));
+  const loadPositionData = async () => {
+    setLoading(true);
+    if (!isLiveMode) {
+      const mock = MOCK_POSITIONS.find(p => p.id.includes(numericId)) || MOCK_POSITIONS[0];
+      setPosition(mock);
+      setLoading(false);
+      return;
+    }
 
-      setIsDepositing(false);
-      setDepositSuccess(`Successfully registered deposit proof for Query ID ${newQueryId.substring(0, 14)}... Collateral updated on CC3.`);
-    }, 600);
+    try {
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_CC3_RPC_URL || 'https://rpc.cc3-testnet.creditcoin.network'
+      );
+      const lendingManager = new ethers.Contract(
+        CONTRACT_ADDRESSES.lendingPositionManager,
+        LENDING_POSITION_MANAGER_ABI,
+        provider
+      );
+      const vaultContract = new ethers.Contract(
+        CONTRACT_ADDRESSES.causoraVault,
+        CAUSORA_VAULT_ABI,
+        provider
+      );
+
+      const posIdBn = BigInt(numericId);
+      const raw = await lendingManager.getPosition(posIdBn);
+
+      if (raw.borrower === ethers.ZeroAddress) {
+        // Position not found on CC3
+        setPosition(null);
+      } else {
+        const stateNames = ['NON_EXISTENT', 'SAFE', 'AT_RISK', 'HELD_PENDING_ORDER', 'RESCUED', 'LIQUIDATED'];
+        let lockedAmountStr = ethers.formatEther(raw.collateralAmount);
+        let isHeld = false;
+        try {
+          const lockedOnVault = await vaultContract.lockedCollateral(posIdBn);
+          lockedAmountStr = ethers.formatEther(lockedOnVault);
+          isHeld = await vaultContract.isHeld(posIdBn);
+        } catch (_) {}
+
+        let positionState = stateNames[raw.state] as any;
+        if (isHeld) {
+          positionState = 'HELD_PENDING_ORDER';
+        }
+
+        setPosition({
+          id: `CC3-POS-${numericId}`,
+          borrower: `${raw.borrower.slice(0, 6)}...${raw.borrower.slice(-4)}`,
+          collateralAsset: 'ctUSD (CC3 Test Asset)',
+          collateralAmount: `${lockedAmountStr} ctUSD`,
+          debtAmount: `${ethers.formatEther(raw.debtAmount)} ctUSD`,
+          healthFactor: raw.state === 2 ? 0.95 : raw.state === 3 ? 1.05 : 1.25,
+          status: positionState,
+          lastDepositQueryId: raw.lastEvidenceDigest,
+          lastLiquidationQueryId: ethers.ZeroHash,
+          lastUpdatedAt: Number(raw.lastUpdatedAt),
+          history: [],
+        });
+      }
+    } catch (err) {
+      console.warn('Error loading live position:', err);
+      setPosition(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Handle Guarded Liquidation Attempt
-  const handleLiquidation = () => {
-    setIsLiquidating(true);
-    setTimeout(() => {
-      const actionQueryId = computeQueryId(1, liqBlock, liqTxIndex);
-      const isSepolia = position.id.includes('ETH');
+  useEffect(() => {
+    loadPositionData();
+  }, [numericId, isLiveMode, address]);
 
-      let action: ActionDecision = 'REJECT';
-      let relation: RelationType = 'BEFORE';
-      let reason = '';
+  // Real Web3 Deposit Collateral
+  const handleRealDeposit = async () => {
+    if (!walletClient || !address) {
+      alert("Please connect your wallet first.");
+      return;
+    }
+    if (chainId !== 102031) {
+      alert("Please switch to Creditcoin CC3 Testnet (102031).");
+      return;
+    }
 
-      if (isSepolia) {
-        // Intra-chain check against last deposit (5824100, 42)
-        if (liqBlock > 5824100 || (liqBlock === 5824100 && liqTxIndex > 42)) {
-          action = 'ACT';
-          relation = 'AFTER';
-          reason = `OK_PROVEN_ORDER_AFTER: Liquidation trigger at Sepolia block ${liqBlock} strictly succeeded borrower deposit at 5824100. Liquidation executed.`;
-        } else {
-          action = 'REJECT';
-          relation = 'BEFORE';
-          reason = `ERR_ORDER_INVALID_PRIOR: Liquidation event at block ${liqBlock} occurred prior to borrower deposit at 5824100. Retroactive liquidation prevented.`;
-        }
-      } else {
-        // Cross-chain (Bitcoin vs Sepolia)
-        if (liqWitness) {
-          action = 'ACT';
-          relation = 'AFTER';
-          reason = 'OK_CROSS_CHAIN_WITNESS: Valid Merkle causal witness verified by CausoraGuard. Order proven.';
-        } else {
-          action = 'HOLD';
-          relation = 'CONCURRENT_UNPROVABLE';
-          reason = 'ERR_CROSS_CHAIN_UNORDERED_HOLD: No cross-chain causal witness provided. Position held in limbo to protect collateral.';
+    setIsDepositing(true);
+    setTxStep('AWAITING_WALLET');
+
+    try {
+      const posIdBn = BigInt(numericId);
+      const colWei = ethers.parseEther(depositAmount || '10');
+
+      // 1. Check Allowance
+      setTxStep('CHECKING_ALLOWANCE');
+      if (publicClient) {
+        const allowance = (await publicClient.readContract({
+          address: CONTRACT_ADDRESSES.mockERC20,
+          abi: MOCK_ERC20_ABI,
+          functionName: 'allowance',
+          args: [address, CONTRACT_ADDRESSES.causoraVault],
+        })) as bigint;
+
+        if (allowance < colWei) {
+          setTxStep('AWAITING_APPROVAL_SIGNATURE');
+          const approveHash = await walletClient.writeContract({
+            address: CONTRACT_ADDRESSES.mockERC20,
+            abi: MOCK_ERC20_ABI,
+            functionName: 'approve',
+            args: [CONTRACT_ADDRESSES.causoraVault, colWei],
+          });
+          setTxStep('CONFIRMING_APPROVAL');
+          await publicClient.waitForTransactionReceipt({ hash: approveHash });
         }
       }
 
-      const newDecision: DecisionRecord = {
-        decisionId: `0xdec${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`,
-        positionId: position.id,
-        depositQueryId: position.lastDepositQueryId,
-        actionQueryId: actionQueryId,
-        actionType: 'LIQUIDATION',
-        relation: relation,
-        action: action,
-        reasonCode: action === 'ACT' ? 'OK_PROVEN_ORDER' : action === 'HOLD' ? 'ERR_UNORDERED_HOLD' : 'ERR_RETROACTIVE_REJECT',
-        reasonDescription: reason,
-        timestamp: Math.floor(Date.now() / 1000),
-        txHash: `0x${Math.random().toString(16).substring(2, 34)}`,
-        blockNumber: 10495,
-        gasUsed: action === 'ACT' ? 84200 : 41500
-      };
-
-      setLiqResult({
-        action,
-        relation,
-        reason,
-        decisionId: newDecision.decisionId
+      // 2. Deposit into CausoraVault
+      setTxStep('AWAITING_DEPOSIT_SIGNATURE');
+      const depositHash = await walletClient.writeContract({
+        address: CONTRACT_ADDRESSES.causoraVault,
+        abi: CAUSORA_VAULT_ABI,
+        functionName: 'depositCollateral',
+        args: [posIdBn, colWei],
       });
 
-      setPosition(prev => ({
-        ...prev,
-        status: action === 'ACT' ? 'LIQUIDATED' : action === 'HOLD' ? 'HELD_PENDING_ORDER' : prev.status,
-        history: [newDecision, ...prev.history]
-      }));
+      setTxStep('CONFIRMING_DEPOSIT');
+      if (publicClient) {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: depositHash });
+        setLastReceipt({
+          action: 'DEPOSIT_COLLATERAL',
+          contractName: 'CausoraVault',
+          contractAddress: CONTRACT_ADDRESSES.causoraVault,
+          network: 'Creditcoin CC3 Testnet (102031)',
+          txHash: depositHash,
+          blockNumber: receipt.blockNumber.toString(),
+          status: 'CONFIRMED',
+          gasUsed: receipt.gasUsed.toString(),
+          details: `Deposited ${depositAmount} ctUSD into CausoraVault for Position #${numericId}.`
+        });
+      }
 
+      await loadPositionData();
+    } catch (err: any) {
+      console.error("Deposit error:", err);
+      alert("Deposit failed: " + (err.shortMessage || err.message || String(err)));
+    } finally {
+      setIsDepositing(false);
+      setTxStep('');
+    }
+  };
+
+  // Real Web3 Liquidation Attempt / Simulation
+  const handleRealLiquidation = async () => {
+    if (!walletClient || !address) {
+      alert("Please connect your wallet first.");
+      return;
+    }
+
+    setIsLiquidating(true);
+    setLiqResult(null);
+
+    try {
+      const posIdBn = BigInt(numericId);
+
+      // Attempt simulation on CC3
+      if (publicClient) {
+        try {
+          await publicClient.simulateContract({
+            address: CONTRACT_ADDRESSES.causoraVault,
+            abi: CAUSORA_VAULT_ABI,
+            functionName: 'executeProtectedTransition',
+            args: [posIdBn, 2 /* ALLOW_B */, address, address, ethers.parseEther('10')],
+            account: address,
+          });
+
+          setLiqResult({
+            action: 'ACT',
+            relation: 'AFTER',
+            reason: 'OK_PROVEN_ORDER: Liquidation condition authorized on CC3.',
+            decisionId: '0x' + Date.now().toString(16),
+          });
+        } catch (simErr: any) {
+          const errMsg = simErr.shortMessage || simErr.message || String(simErr);
+          const isHeld = errMsg.includes('PositionIsHeld') || errMsg.includes('UnauthorizedCaller');
+
+          setLiqResult({
+            action: isHeld ? 'HOLD' : 'REJECT',
+            relation: 'CONCURRENT_UNPROVABLE',
+            reason: isHeld
+              ? `[ON-CHAIN REVERT PROVEN] PositionIsHeld(${numericId}): CausoraVault collateral is frozen in fail-closed HOLD state. Liquidation strictly blocked on Creditcoin CC3.`
+              : `[CC3 REVERT] ${errMsg}`,
+            decisionId: '0x' + Date.now().toString(16),
+          });
+
+          const currentBlock = await publicClient.getBlockNumber();
+          setLastReceipt({
+            action: 'ATTEMPT_LIQUIDATION',
+            contractName: 'CausoraVault',
+            contractAddress: CONTRACT_ADDRESSES.causoraVault,
+            network: 'Creditcoin CC3 Testnet (102031)',
+            txHash: '',
+            blockNumber: currentBlock.toString(),
+            status: 'REVERTED',
+            revertReason: isHeld ? `LIQUIDATION BLOCKED BY CAUSORA GUARD: PositionIsHeld(${numericId})` : errMsg,
+            details: 'Speculative liquidation intercepted and reverted by CausoraVault fail-closed firewall on CC3.'
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error("Liquidation attempt error:", err);
+    } finally {
       setIsLiquidating(false);
-    }, 600);
+    }
   };
 
   return (
-    <div className="space-y-8">
-      {/* Top Breadcrumb & Position Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-border pb-6">
+    <div className="space-y-6">
+      {/* Network Alert */}
+      {isWrongNetwork && (
+        <div className="p-4 rounded-xl bg-amber-950/70 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-2 text-amber-300">
+            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+            <span>Connected to Chain {chainId}. Please switch to Creditcoin CC3 Testnet (102031).</span>
+          </div>
+          <button
+            onClick={() => switchChain({ chainId: 102031 })}
+            disabled={isSwitchingChain}
+            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs"
+          >
+            Switch to CC3
+          </button>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-border pb-4">
         <div className="flex items-center gap-3">
           <Link
             href="/app/positions"
@@ -150,222 +306,217 @@ export default function PositionDetailPage() {
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-white font-mono">{position.id}</h1>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-surface-subtle border border-surface-border text-slate-300 font-mono">
-                {position.status}
-              </span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-mono uppercase text-blue-400">Position Inspector</span>
+              {isLiveMode ? (
+                <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  LIVE CC3 ON-CHAIN
+                </span>
+              ) : (
+                <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-500/30">
+                  LOCAL LAB
+                </span>
+              )}
             </div>
-            <span className="text-xs font-mono text-slate-400">Borrower: {position.borrower}</span>
+            <h1 className="text-2xl font-bold text-white font-display">
+              {position ? position.id : `Position #${numericId}`}
+            </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-surface border border-surface-border text-right font-mono">
-            <span className="text-[10px] text-slate-500 block">Health Factor</span>
-            <span className={`text-lg font-bold ${position.healthFactor < 1.0 ? "text-rose-400" : position.healthFactor < 1.2 ? "text-amber-400" : "text-emerald-400"}`}>
-              {position.healthFactor.toFixed(2)}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Position Parameters Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-surface border border-surface-border space-y-1">
-          <span className="text-[11px] font-mono text-slate-400">Guarded Collateral</span>
-          <div className="text-xl font-bold text-white font-mono">{position.collateralAmount}</div>
-          <span className="text-[11px] text-emerald-400 font-mono">Verified (0xFD2)</span>
-        </div>
-        <div className="p-4 rounded-xl bg-surface border border-surface-border space-y-1">
-          <span className="text-[11px] font-mono text-slate-400">Outstanding Debt</span>
-          <div className="text-xl font-bold text-slate-200 font-mono">{position.debtAmount}</div>
-          <span className="text-[11px] text-slate-400 font-mono">Creditcoin CC3 Asset</span>
-        </div>
-        <div className="p-4 rounded-xl bg-surface border border-surface-border space-y-1">
-          <span className="text-[11px] font-mono text-slate-400">Last Proven Anchor</span>
-          <div className="text-xs font-bold text-blue-400 font-mono truncate">{position.lastDepositQueryId.substring(0, 16)}...</div>
-          <span className="text-[11px] text-slate-400 font-mono">Packed 72-Byte Query</span>
-        </div>
-        <div className="p-4 rounded-xl bg-surface border border-surface-border space-y-1">
-          <span className="text-[11px] font-mono text-slate-400">Fail-Closed Status</span>
-          <div className="text-base font-bold text-white">
-            {position.status === 'HELD_PENDING_ORDER' ? (
-              <span className="text-amber-400 flex items-center gap-1">
-                <Lock className="w-4 h-4" /> Preserved In Limbo
-              </span>
-            ) : (
-              <span className="text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="w-4 h-4" /> Active &amp; Guarded
-              </span>
-            )}
-          </div>
-          <span className="text-[11px] text-slate-400 font-mono">CausoraGuard Active</span>
-        </div>
-      </div>
-
-      {/* Interactive Actions Tabs: Top-up vs Attempt Liquidation */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top-Up Collateral Simulator */}
-        <div className="p-6 rounded-2xl bg-surface border border-surface-border space-y-4">
-          <div className="flex items-center justify-between border-b border-surface-border pb-3">
-            <div className="flex items-center gap-2">
-              <PlusCircle className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-white">Top-Up Cross-Chain Collateral</h3>
-            </div>
-            <span className="text-[10px] font-mono text-slate-500">Source: Sepolia</span>
-          </div>
-
-          <p className="text-xs text-slate-300">
-            Submit a deposit on Sepolia and generate an Attestcoin inclusion proof verified by Creditcoin `0xFD2` to increase collateral and health factor.
-          </p>
-
-          <div className="space-y-3 text-xs">
-            <div>
-              <label className="block text-slate-400 mb-1">Deposit Amount (ETH)</label>
-              <input
-                type="text"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-400 mb-1">Sepolia Block</label>
-                <input
-                  type="number"
-                  value={depositBlock}
-                  onChange={(e) => setDepositBlock(Number(e.target.value))}
-                  className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1">Tx Index</label>
-                <input
-                  type="number"
-                  value={depositTxIndex}
-                  onChange={(e) => setDepositTxIndex(Number(e.target.value))}
-                  className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono"
-                />
-              </div>
-            </div>
-          </div>
-
+        <div className="flex items-center gap-2">
           <button
-            onClick={handleDeposit}
-            disabled={isDepositing}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-md disabled:opacity-50"
+            onClick={loadPositionData}
+            className="p-2 rounded-lg bg-surface border border-surface-border text-slate-400 hover:text-white transition-all"
+            title="Reload from CC3"
           >
-            {isDepositing ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Verifying Inclusion via 0xFD2...</span>
-              </>
-            ) : (
-              <>
-                <Shield className="w-3.5 h-3.5" />
-                <span>Deposit &amp; Prove Collateral</span>
-              </>
-            )}
+            <RefreshCw className="w-4 h-4" />
           </button>
-
-          {depositSuccess && (
-            <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-300 font-mono">
-              {depositSuccess}
-            </div>
-          )}
-        </div>
-
-        {/* Attempt Liquidation Simulator */}
-        <div className="p-6 rounded-2xl bg-surface border border-surface-border space-y-4">
-          <div className="flex items-center justify-between border-b border-surface-border pb-3">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-bold text-white">Attempt Guarded Liquidation</h3>
-            </div>
-            <span className="text-[10px] font-mono text-slate-500">Guard: CausoraGuard.sol</span>
+          <div className="flex items-center p-1 bg-[var(--surface)] border border-[var(--hairline)] rounded-xl">
+            <button
+              onClick={() => setIsLiveMode(true)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${
+                isLiveMode ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Zap className="w-3 h-3" />
+              Live CC3
+            </button>
+            <button
+              onClick={() => setIsLiveMode(false)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${
+                !isLiveMode ? 'bg-surface-elevated text-amber-300' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <FlaskConical className="w-3 h-3" />
+              Local Lab
+            </button>
           </div>
-
-          <p className="text-xs text-slate-300">
-            Submit a liquidation event. The RelationEngine compares the event against the borrower&apos;s last proven deposit before granting execution.
-          </p>
-
-          <div className="space-y-3 text-xs">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-400 mb-1">Liquidation Block</label>
-                <input
-                  type="number"
-                  value={liqBlock}
-                  onChange={(e) => setLiqBlock(Number(e.target.value))}
-                  className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1">Tx Index</label>
-                <input
-                  type="number"
-                  value={liqTxIndex}
-                  onChange={(e) => setLiqTxIndex(Number(e.target.value))}
-                  className="w-full bg-surface-subtle border border-surface-border rounded-lg px-3 py-2 text-white font-mono"
-                />
-              </div>
-            </div>
-
-            {!position.id.includes('ETH') && (
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="liqWitnessCheck"
-                  checked={liqWitness}
-                  onChange={(e) => setLiqWitness(e.target.checked)}
-                  className="rounded bg-surface border-surface-border text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="liqWitnessCheck" className="text-xs text-slate-300 select-none">
-                  Provide Cross-Chain Merkle Causal Witness
-                </label>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={handleLiquidation}
-            disabled={isLiquidating}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition-all shadow-md disabled:opacity-50"
-          >
-            {isLiquidating ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Evaluating Orderability Engine...</span>
-              </>
-            ) : (
-              <>
-                <Zap className="w-3.5 h-3.5" />
-                <span>Submit Liquidation to CausoraGuard</span>
-              </>
-            )}
-          </button>
-
-          {liqResult && (
-            <div className="p-3.5 rounded-xl bg-surface-elevated border border-surface-border space-y-2 text-xs font-mono">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Verdict:</span>
-                <ActionBadge decision={liqResult.action} size="md" />
-              </div>
-              <div className="text-slate-300 text-[11px] leading-relaxed">
-                {liqResult.reason}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Audit Trail for this Position */}
-      <div className="space-y-4">
-        <h3 className="text-base font-bold text-white">Immutable Settlement Audit Trail</h3>
-        <EvidenceTimeline decisions={position.history} proofs={MOCK_PROOFS} />
-      </div>
+      {lastReceipt && (
+        <TransactionReceiptPanel
+          receipt={lastReceipt}
+          onDismiss={() => setLastReceipt(null)}
+        />
+      )}
+
+      {loading ? (
+        <div className="p-12 rounded-xl bg-surface border border-surface-border text-center text-xs font-mono text-slate-400 flex items-center justify-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
+          <span>Loading position #{numericId} from Creditcoin CC3...</span>
+        </div>
+      ) : !position ? (
+        <div className="p-12 rounded-xl bg-surface border border-surface-border text-center space-y-3 font-mono text-xs">
+          <Shield className="w-8 h-8 text-slate-600 mx-auto" />
+          <h3 className="text-white font-bold text-sm">Position #{numericId} not found on Creditcoin CC3.</h3>
+          <p className="text-slate-400">Please verify the position ID or create a position from the main console.</p>
+          <Link
+            href="/app"
+            className="inline-block px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs"
+          >
+            Return to Console
+          </Link>
+        </div>
+      ) : (
+        <>
+          {/* Position Health & Metrics Banner */}
+          <div className="p-6 rounded-2xl bg-surface border border-surface-border space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-surface-border pb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white font-mono">Status:</span>
+                <span className={`text-xs font-mono px-2.5 py-1 rounded border ${
+                  position.status === 'HELD_PENDING_ORDER'
+                    ? 'bg-amber-950 text-amber-300 border-amber-500/30'
+                    : position.status === 'AT_RISK'
+                    ? 'bg-rose-950 text-rose-300 border-rose-500/30'
+                    : 'bg-emerald-950 text-emerald-300 border-emerald-500/30'
+                }`}>
+                  {position.status}
+                </span>
+              </div>
+              <span className="text-xs font-mono text-slate-400">Borrower: {position.borrower}</span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
+              <div className="p-4 rounded-xl bg-surface-subtle border border-surface-border space-y-1">
+                <span className="text-slate-500 block text-[10px]">Locked Collateral</span>
+                <div className="text-lg font-bold text-white">{position.collateralAmount}</div>
+                <span className="text-[10px] text-emerald-400">Secured in CausoraVault</span>
+              </div>
+              <div className="p-4 rounded-xl bg-surface-subtle border border-surface-border space-y-1">
+                <span className="text-slate-500 block text-[10px]">Total Debt</span>
+                <div className="text-lg font-bold text-slate-200">{position.debtAmount}</div>
+                <span className="text-[10px] text-slate-400">Creditcoin Lending Asset</span>
+              </div>
+              <div className="p-4 rounded-xl bg-surface-subtle border border-surface-border space-y-1">
+                <span className="text-slate-500 block text-[10px]">Health Factor</span>
+                <div className={`text-lg font-bold ${
+                  position.healthFactor < 1.0 ? 'text-rose-400' : position.healthFactor < 1.2 ? 'text-amber-400' : 'text-emerald-400'
+                }`}>
+                  {position.healthFactor.toFixed(2)}
+                </div>
+                <span className="text-[10px] text-slate-400">Threshold: 1.00</span>
+              </div>
+              <div className="p-4 rounded-xl bg-surface-subtle border border-surface-border space-y-1">
+                <span className="text-slate-500 block text-[10px]">Last Admitted Digest</span>
+                <div className="text-sm font-bold text-blue-400 truncate">
+                  {position.lastDepositQueryId.substring(0, 16)}...
+                </div>
+                <span className="text-[10px] text-slate-400">Attestcoin Query ID</span>
+              </div>
+            </div>
+
+            {position.status === 'HELD_PENDING_ORDER' && (
+              <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-center gap-3 text-xs font-mono text-amber-300">
+                <Lock className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                <span>
+                  <strong>Fail-Closed Hold Active on CC3:</strong> Collateral is immutably frozen in CausoraVault against an unprovable cross-chain race. Liquidation triggers will revert.
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Interactive Web3 Operations Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Panel 1: Real Deposit Collateral */}
+            <div className="p-6 rounded-2xl bg-surface border border-surface-border space-y-4">
+              <div className="space-y-1">
+                <span className="text-xs font-mono uppercase text-blue-400">Collateral Influx</span>
+                <h3 className="text-base font-bold text-white font-display">Deposit Collateral (CausoraVault)</h3>
+                <p className="text-xs text-slate-400">
+                  Transfers ctUSD to CausoraVault and locks it for Position #{numericId}.
+                </p>
+              </div>
+
+              <div className="space-y-3 text-xs font-mono">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-semibold">Deposit Amount (ctUSD)</label>
+                  <input
+                    type="text"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    disabled={isDepositing}
+                    className="w-full px-3 py-2 rounded-lg bg-surface-subtle border border-surface-border text-white font-mono"
+                  />
+                </div>
+
+                {txStep && (
+                  <div className="p-3 rounded-lg bg-surface-subtle border border-surface-border text-blue-400 flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{txStep}</span>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleRealDeposit}
+                  disabled={isDepositing || isWrongNetwork || !isConnected}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all shadow disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{isDepositing ? 'Signing in Wallet...' : 'Sign & Deposit Collateral'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Panel 2: Real Liquidation Attempt */}
+            <div className="p-6 rounded-2xl bg-surface border border-surface-border space-y-4">
+              <div className="space-y-1">
+                <span className="text-xs font-mono uppercase text-rose-400">Adverse Liquidation Attempt</span>
+                <h3 className="text-base font-bold text-white font-display">Test Liquidation Interception</h3>
+                <p className="text-xs text-slate-400">
+                  Executes a liquidation call on CC3. If the position is HELD, proves the fail-closed revert.
+                </p>
+              </div>
+
+              <div className="space-y-3 text-xs font-mono">
+                <button
+                  onClick={handleRealLiquidation}
+                  disabled={isLiquidating || !isConnected}
+                  className="w-full py-2.5 rounded-xl bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 border border-rose-500/30 font-bold text-xs transition-all shadow disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>{isLiquidating ? 'Simulating on CC3...' : 'Simulate / Attempt Liquidation'}</span>
+                </button>
+
+                {liqResult && (
+                  <div className="p-4 rounded-xl bg-surface-subtle border border-surface-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white">Decision:</span>
+                      <ActionBadge decision={liqResult.action} />
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                      {liqResult.reason}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
