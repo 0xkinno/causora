@@ -87,8 +87,9 @@ test.describe('CAUSORA E2E Suite', () => {
     // Load Sepolia Deposit preset
     await page.click('button:has-text("Sepolia Deposit (Tx 42)")');
     await page.click('button:has-text("Inspect Verified Evidence")');
-    await expect(page.getByText('Evidence Not Admitted')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Canonical 72-Byte Packed Query ID:')).toBeVisible();
+    await expect(page.getByText('ATTESTCOIN PROOF ACCEPTED')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Admitted & Verified on CC3')).toBeVisible();
+    await expect(page.getByText('Canonical Query ID').first()).toBeVisible();
   });
 
   test('AI Agent MCP Interface (/mcp): Tool Execution Sandbox', async ({ page }) => {

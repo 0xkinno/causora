@@ -21,10 +21,13 @@ test.describe('Vercel Production Deployment (causora.vercel.app)', () => {
 
   test('2. Verify Page (/verify) strictly fails closed on unadmitted query coordinates', async ({ page }) => {
     await page.goto(`${VERCEL_URL}/verify`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('h1')).toContainText('Cryptographic Proof Verifier');
 
-    // Configure coordinates from user's screenshot: Ethereum Mainnet (ChainKey: 3), Height 5824100, TxIndex 42
+    // Switch to Path B to evaluate unadmitted fail-closed policy
+    await page.click('button:has-text("PATH B — NOT ADMITTED → REJECTED")');
+
+    // Configure coordinates: Ethereum Mainnet (ChainKey: 3), Height 5824100, TxIndex 42
     await page.selectOption('select', '3');
     const blockInput = page.locator('input[type="number"]').first();
     await blockInput.fill('5824100');
@@ -119,7 +122,7 @@ test.describe('Vercel Production Deployment (causora.vercel.app)', () => {
     });
 
     await page.goto(`${VERCEL_URL}/app`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('h1')).toContainText('Causora Protocol Console');
 
     // Connect wallet if connect button is present
