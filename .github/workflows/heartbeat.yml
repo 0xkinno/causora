@@ -4,11 +4,21 @@ on:
     - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   heartbeat:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: npm ci
@@ -19,5 +29,9 @@ jobs:
           git config user.name "causora-heartbeat"
           git config user.email "actions@github.com"
           git add evidence/heartbeat.jsonl
-          git commit -m "heartbeat: $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "no change"
-          git push
+          if git commit -m "heartbeat: $(date -u +%Y-%m-%dT%H:%M:%SZ)"; then
+            git pull --rebase origin main || true
+            git push origin main
+          else
+            echo "no change"
+          fi

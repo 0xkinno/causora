@@ -21,8 +21,7 @@
 > **BUIDL CTC 2026 Fall · Creditcoin & Credit Labs · Track: DeFi**
 > 
 > Attack count is generated, not typed: `npm run count:attacks` regenerates this badge's
-> number from `tests/attacks/` directly, and CI fails the build if the README's number and
-> the folder's actual count disagree.
+> number from `tests/attacks/` directly.
 
 ---
 
