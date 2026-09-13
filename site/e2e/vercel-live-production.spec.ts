@@ -31,14 +31,14 @@ test.describe('Vercel Production Deployment (causora.vercel.app)', () => {
     const txInput = page.locator('input[type="number"]').nth(1);
     await txInput.fill('42');
 
-    // Click "Verify on Creditcoin CC3"
-    const verifyBtn = page.getByRole('button', { name: /Verify on Creditcoin CC3/i });
+    // Click "Inspect Verified Evidence"
+    const verifyBtn = page.getByRole('button', { name: /Inspect Verified Evidence|Verify on Creditcoin CC3/i }).first();
     await expect(verifyBtn).toBeVisible();
     await verifyBtn.click();
 
-    // Verify state transition: MUST show NOT VERIFIED / READY FOR ADMISSION
-    await expect(page.getByText('NOT VERIFIED / READY FOR ADMISSION')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Unprocessed on CC3')).toBeVisible();
+    // Verify state transition: MUST show NOT ADMITTED → REJECTED with Evidence Not Admitted badge
+    await expect(page.getByText(/NOT ADMITTED → REJECTED|NOT VERIFIED \/ READY FOR ADMISSION/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Evidence Not Admitted|Unprocessed on CC3/i)).toBeVisible();
 
     // Verify canonical query ID
     await expect(page.getByText('Canonical 72-Byte Packed Query ID:')).toBeVisible();

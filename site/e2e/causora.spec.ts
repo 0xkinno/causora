@@ -86,8 +86,8 @@ test.describe('CAUSORA E2E Suite', () => {
 
     // Load Sepolia Deposit preset
     await page.click('button:has-text("Sepolia Deposit (Tx 42)")');
-    await page.click('button:has-text("Verify on Creditcoin CC3")');
-    await expect(page.getByText('READY FOR ADMISSION')).toBeVisible({ timeout: 5000 });
+    await page.click('button:has-text("Inspect Verified Evidence")');
+    await expect(page.getByText('Evidence Not Admitted')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Canonical 72-Byte Packed Query ID:')).toBeVisible();
   });
 

@@ -2,42 +2,38 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
 
-  test('Proof Verifier (/verify): Unadmitted coordinates strictly fail closed to REJECT', async ({ page }) => {
+  test('Proof Verifier (/verify): Unadmitted coordinates strictly fail closed to REJECT with Evidence Not Admitted badge', async ({ page }) => {
     await page.goto('/verify');
     await expect(page.locator('h1')).toContainText('Cryptographic Proof Verifier');
 
-    // Configure coordinates matching user screenshot: ChainKey 3 (Ethereum Mainnet), Height 5824100, TxIndex 42
+    // Configure coordinates matching unadmitted test: ChainKey 3 (Ethereum Mainnet), Height 5824100, TxIndex 42
     await page.selectOption('select', '3'); // Ethereum Mainnet (ChainKey: 3)
     const blockInput = page.locator('input[type="number"]').first();
     await blockInput.fill('5824100');
     const txInput = page.locator('input[type="number"]').nth(1);
     await txInput.fill('42');
 
-    // Click "Verify on Creditcoin CC3"
-    const verifyBtn = page.getByRole('button', { name: /Verify on Creditcoin CC3/i });
-    await expect(verifyBtn).toBeVisible();
-    await verifyBtn.click();
+    // Click "Inspect Verified Evidence"
+    const inspectBtn = page.getByRole('button', { name: /Inspect Verified Evidence/i }).first();
+    await expect(inspectBtn).toBeVisible();
+    await inspectBtn.click();
 
-    // Verify state transition: MUST show NOT VERIFIED / READY FOR ADMISSION
-    await expect(page.getByText('NOT VERIFIED / READY FOR ADMISSION')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Unprocessed on CC3')).toBeVisible();
+    // Verify state transition: MUST show NOT ADMITTED → REJECTED with Evidence Not Admitted badge
+    await expect(page.getByText('NOT ADMITTED → REJECTED')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Evidence Not Admitted')).toBeVisible();
 
     // Verify canonical query ID is computed and rendered
     await expect(page.getByText('Canonical 72-Byte Packed Query ID:')).toBeVisible();
-    const queryIdText = page.locator('text=0x7e4fe53e1f7496a054760845fecc54c9cf77743098bcdb4f6feb2c5fe08d5c68');
+    const queryIdText = page.locator('text=0x7e4fe53e1f7496a054760845fecc54c9cf77743098bcdb4f6feb2c5fe08d5c68').first();
     await expect(queryIdText).toBeVisible();
 
     // Verify Zero Synthetic Verification Explanation banner
     await expect(page.getByText('Zero Synthetic Verification Enforced:')).toBeVisible();
 
-    // Verify the 4 Fail-Closed Gates match the screenshot:
-    // Gate 1: Failed Root Trie
+    // Verify the 4 Fail-Closed Gates:
     await expect(page.getByText('Failed Root Trie').first()).toBeVisible();
-    // Gate 2: Uncle/Fork Replay
     await expect(page.getByText('Uncle/Fork Replay').first()).toBeVisible();
-    // Gate 3: Unprovable Clock Drift
     await expect(page.getByText('Unprovable Clock Drift').first()).toBeVisible();
-    // Gate 4: Action: REJECT
     await expect(page.getByText('Action: REJECT').first()).toBeVisible();
 
     // Verify all 4 gates show Rejected (Fail-Closed)
@@ -78,14 +74,14 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
               transactionHash: params?.[0] || '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
               blockNumber: '0x1001',
               status: '0x1',
-              gasUsed: '0x15f90', // 90000 gas
+              gasUsed: '0x15f90',
             };
           }
           if (method === 'eth_call') {
             return '0x00000000000000000000000000000000000000000000003635c9adc5dea00000';
           }
           if (method === 'eth_estimateGas') {
-            return '0x186a0'; // 100000
+            return '0x186a0';
           }
           return null;
         },
@@ -157,7 +153,7 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
     // Inject mock EVM provider initialized on Ethereum Mainnet (0x1)
     await page.addInitScript(() => {
       const mockAddress = '0xe4b713e3cf2e550147f9cc09d751f276e7b9a64e';
-      let currentChainId = '0x1'; // Starts on Ethereum Mainnet!
+      let currentChainId = '0x1'; // Starts on Ethereum Mainnet
       let switchRequests: any[] = [];
       let allRequests: any[] = [];
       (window as any).__switchRequests = switchRequests;
@@ -260,10 +256,7 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
     await expect(page.getByText(/Preparing|Awaiting|Switching|Creditcoin CC3|Transaction/i).first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('Proof Verifier (/verify): Connected wallet triggers real on-chain transaction and renders confirmed on-chain report', async ({ page }) => {
-    let transactionSent = false;
-    let requestedMethod = '';
-
+  test('Proof Verifier (/verify): Path B connected wallet triggers on-chain guard evaluation and renders ON-CHAIN REJECTION — EVIDENCE NOT ADMITTED', async ({ page }) => {
     await page.addInitScript(() => {
       const mockAddress = '0xe4b713e3cf2e550147f9cc09d751f276e7b9a64e';
       const mockChainId = '0x18e8f'; // 102031 in hex
@@ -288,7 +281,6 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
             return '0x582410';
           }
           if (method === 'eth_sendTransaction') {
-            (window as any).__txSent = true;
             return '0xfeedbeef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
           }
           if (method === 'eth_getTransactionReceipt') {
@@ -296,7 +288,7 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
               transactionHash: '0xfeedbeef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
               blockNumber: '0x582411',
               status: '0x1',
-              gasUsed: '0x14800', // 83968 gas
+              gasUsed: '0x14800',
             };
           }
           if (method === 'eth_call') {
@@ -328,20 +320,21 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
       await connectBtn.click();
     }
 
-    // Button triggers verification
-    const verifyBtn = page.getByRole('button', { name: /Verify on Creditcoin CC3/i });
-    await expect(verifyBtn).toBeVisible();
-    await verifyBtn.click();
+    // Switch to Path B
+    await page.click('button:has-text("PATH B — NOT ADMITTED → REJECTED")');
 
-    // If initial read check shows unadmitted, click Sign On-Chain Proof Verification to trigger wallet signing
-    const signProofBtn = page.getByRole('button', { name: /Sign On-Chain Proof Verification on Creditcoin CC3/i });
-    if (await signProofBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await signProofBtn.click();
-    }
+    // Button triggers Guard financial policy evaluation
+    const evalBtn = page.getByRole('button', { name: /Evaluate Financial Policy/i }).first();
+    await expect(evalBtn).toBeVisible();
+    await evalBtn.click();
 
-    // Verify on-chain execution renders confirmed on-chain report
-    await expect(page.getByText('ON-CHAIN VERIFIED: FAIL-CLOSED (REJECT)')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Confirmed on Creditcoin CC3', { exact: true })).toBeVisible();
+    // Verify on-chain execution renders confirmed on-chain rejection:
+    // Headline MUST be "ON-CHAIN REJECTION — EVIDENCE NOT ADMITTED"
+    await expect(page.getByText('ON-CHAIN REJECTION — EVIDENCE NOT ADMITTED')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Evidence Not Admitted', { exact: true })).toBeVisible();
+
+    // Verify exact required explanation
+    await expect(page.getByText('CausoraGuard refused authorization because the requested evidence was not present in the canonical registry.')).toBeVisible();
 
     // Verify on-chain transaction hash and Blockscout explorer link
     await expect(page.getByText('0xfeedbeef1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBeVisible();
@@ -355,5 +348,105 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
     await expect(page.getByText('Action: REJECT').first()).toBeVisible();
   });
 
-});
+  test('Proof Verifier (/verify): Verified Demo Evidence preset loads and displays real admitted proof', async ({ page }) => {
+    await page.goto('/verify');
+    await expect(page.locator('h1')).toContainText('Cryptographic Proof Verifier');
 
+    // Click Verified Demo Evidence button
+    const demoBtn = page.getByRole('button', { name: /Verified Demo Evidence/i });
+    await expect(demoBtn).toBeVisible();
+    await demoBtn.click();
+
+    // Verify state transition: ATTESTCOIN PROOF ACCEPTED
+    await expect(page.getByText('ATTESTCOIN PROOF ACCEPTED')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Admitted & Verified on CC3')).toBeVisible();
+
+    // Verify real query ID
+    await expect(page.getByText('0x56ec8b88df209b780e2db0c6b045fbea63c5ff4e605367f4cea3a229d2d77c00').first()).toBeVisible();
+
+    // Verify CC3 admission transaction link to Blockscout
+    await expect(page.getByText('0xf578a0dce2b3679550da19de29640f3d01f571511363850bb11eef68049a0872')).toBeVisible();
+    await expect(page.getByRole('link', { name: /View on Blockscout/i })).toBeVisible();
+
+    // Verify precompiles and coordinates
+    await expect(page.getByText('0xFD2 (BlockProver)').first()).toBeVisible();
+    await expect(page.getByText('0xFD3 (ChainInfo)').first()).toBeVisible();
+
+    // Verify GateStatus passed
+    await expect(page.getByText('Action: ACT').first()).toBeVisible();
+  });
+
+  test('Proof Verifier (/verify): Path A real Attestcoin proof admission triggers wallet signature and admits on CC3', async ({ page }) => {
+    await page.addInitScript(() => {
+      const mockAddress = '0xe4b713e3cf2e550147f9cc09d751f276e7b9a64e';
+      const mockChainId = '0x18e8f'; // 102031 in hex
+
+      let listeners: Record<string, Function[]> = {};
+
+      (window as any).ethereum = {
+        isMetaMask: true,
+        selectedAddress: mockAddress,
+        chainId: mockChainId,
+        request: async ({ method, params }: { method: string; params?: any[] }) => {
+          if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
+            return [mockAddress];
+          }
+          if (method === 'eth_chainId') {
+            return mockChainId;
+          }
+          if (method === 'net_version') {
+            return '102031';
+          }
+          if (method === 'eth_blockNumber') {
+            return '0x582410';
+          }
+          if (method === 'eth_sendTransaction') {
+            return '0xaabbcc1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+          }
+          if (method === 'eth_getTransactionReceipt') {
+            return {
+              transactionHash: '0xaabbcc1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+              blockNumber: '0x582415',
+              status: '0x1',
+              gasUsed: '0x24300',
+            };
+          }
+          if (method === 'eth_call') {
+            return '0x0000000000000000000000000000000000000000000000000000000000000000';
+          }
+          if (method === 'eth_estimateGas') {
+            return '0x186a0';
+          }
+          return null;
+        },
+        on: (event: string, handler: Function) => {
+          listeners[event] = listeners[event] || [];
+          listeners[event].push(handler);
+        },
+        removeListener: (event: string, handler: Function) => {
+          if (listeners[event]) {
+            listeners[event] = listeners[event].filter(h => h !== handler);
+          }
+        },
+      };
+    });
+
+    await page.goto('/verify');
+
+    // Ensure Path A is active
+    await page.click('button:has-text("PATH A — REAL PROOF ADMISSION")');
+
+    // Click Admit Attestcoin Proof on CC3
+    const admitBtn = page.getByRole('button', { name: /Admit Attestcoin Proof on CC3/i }).first();
+    await expect(admitBtn).toBeVisible();
+    await admitBtn.click();
+
+    // Verify state transition: ATTESTCOIN PROOF ACCEPTED
+    await expect(page.getByText('ATTESTCOIN PROOF ACCEPTED')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Admitted & Verified on CC3')).toBeVisible();
+    await expect(page.getByText('0xaabbcc1234567890abcdef1234567890abcdef1234567890abcdef1234567890')).toBeVisible();
+    await expect(page.getByRole('link', { name: /View on Blockscout/i })).toBeVisible();
+    await expect(page.getByText('0xFD2 (BlockProver)').first()).toBeVisible();
+  });
+
+});
