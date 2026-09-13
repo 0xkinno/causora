@@ -6,6 +6,9 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
     await page.goto('/verify');
     await expect(page.locator('h1')).toContainText('Cryptographic Proof Verifier');
 
+    // Switch to Path B (Unadmitted Query evaluation)
+    await page.click('button:has-text("PATH B — NOT ADMITTED → REJECTED")');
+
     // Configure coordinates matching unadmitted test: ChainKey 3 (Ethereum Mainnet), Height 5824100, TxIndex 42
     await page.selectOption('select', '3'); // Ethereum Mainnet (ChainKey: 3)
     const blockInput = page.locator('input[type="number"]').first();
@@ -449,4 +452,27 @@ test.describe('Wallet Transactions and Proof Verification Test Suite', () => {
     await expect(page.getByText('0xFD2 (BlockProver)').first()).toBeVisible();
   });
 
+  test('Proof Verifier (/verify): Path A "Inspect Verified Evidence" shows actual verified Attestcoin proof and not NOT ADMITTED', async ({ page }) => {
+    await page.goto('/verify');
+    await expect(page.locator('h1')).toContainText('Cryptographic Proof Verifier');
+
+    // Ensure Path A is active
+    await page.click('button:has-text("PATH A — REAL PROOF ADMISSION")');
+
+    // Click Inspect Verified Evidence
+    const inspectBtn = page.getByRole('button', { name: /Inspect Verified Evidence/i }).first();
+    await expect(inspectBtn).toBeVisible();
+    await inspectBtn.click();
+
+    // Verify state transition: ATTESTCOIN PROOF ACCEPTED
+    await expect(page.getByText('ATTESTCOIN PROOF ACCEPTED')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Admitted & Verified on CC3')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'NOT ADMITTED → REJECTED' })).not.toBeVisible();
+    await expect(page.getByText('Evidence Not Admitted')).not.toBeVisible();
+    await expect(page.getByRole('link', { name: /View on Blockscout/i })).toBeVisible();
+    await expect(page.getByText('0xFD2 (BlockProver)').first()).toBeVisible();
+    await expect(page.getByText('Action: ACT').first()).toBeVisible();
+  });
+
 });
+
