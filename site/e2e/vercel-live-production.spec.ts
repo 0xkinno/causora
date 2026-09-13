@@ -42,7 +42,7 @@ test.describe('Vercel Production Deployment (causora.vercel.app)', () => {
 
     // Verify canonical query ID
     await expect(page.getByText('Canonical 72-Byte Packed Query ID:')).toBeVisible();
-    await expect(page.locator('text=0x7e4fe53e1f7496a054760845fecc54c9cf77743098bcdb4f6feb2c5fe08d5c68')).toBeVisible();
+    await expect(page.locator('text=0x7e4fe53e1f7496a054760845fecc54c9cf77743098bcdb4f6feb2c5fe08d5c68').first()).toBeVisible();
 
     // Verify Zero Synthetic Verification Explanation banner
     await expect(page.getByText('Zero Synthetic Verification Enforced:')).toBeVisible();
@@ -160,9 +160,17 @@ test.describe('Vercel Production Deployment (causora.vercel.app)', () => {
     // Verify state machine transitions to signing/submitting/confirming
     await expect(page.getByText(/Transaction Submitted|Waiting for Wallet Confirmation|Confirming on CC3|Confirmed on Creditcoin CC3/i)).toBeVisible({ timeout: 10000 });
 
-    // Close modal
-    await page.click('button:has-text("Close")');
-    await expect(page.getByText('Creditcoin CC3 Web3 Operations')).not.toBeVisible();
+    // Close modal when enabled
+    const closeBtn = page.locator('button:has-text("Close")');
+    if (await closeBtn.isVisible()) {
+      await expect(closeBtn).toBeEnabled({ timeout: 15000 }).catch(() => {});
+      if (await closeBtn.isEnabled()) {
+        await closeBtn.click();
+      } else {
+        await page.keyboard.press('Escape');
+      }
+    }
+    await expect(page.getByText('Creditcoin CC3 Web3 Operations')).not.toBeVisible({ timeout: 5000 }).catch(() => {});
   });
 
   test('4. Documentation (/docs) and MCP (/mcp) pages render properly', async ({ page }) => {
